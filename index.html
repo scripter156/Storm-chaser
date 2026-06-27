@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Storm Chasers: Real Intercept Simulator</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        body { margin: 0; padding: 0; background-color: #0b0c10; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; }
+        #gameContainer { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        canvas { display: block; }
+        
+        /* Telas (Menus) */
+        .menu-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle, #1a1e24 0%, #0b0c10 100%); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 10; padding: 20px; text-align: center;
+        }
+        h1 { color: #e2e8f0; font-size: 32px; margin-bottom: 5px; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .subtitle { color: #64748b; font-size: 13px; margin-bottom: 30px; font-family: monospace; }
+        .menu-btn {
+            width: 240px; padding: 14px; margin: 8px; background: #1e293b;
+            border: 2px solid #475569; color: #f1f5f9; font-size: 15px; font-weight: bold;
+            cursor: pointer; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .menu-btn:active { transform: scale(0.98); background: #f1f5f9; color: #000; }
+        
+        /* Loja */
+        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 500px; margin-bottom: 15px; overflow-y: auto; max-height: 60vh; padding-right: 5px; }
+        .shop-item { background: #151a22; border: 1px solid #2e3748; padding: 10px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .shop-item.owned { border-color: #f59e0b; background: #111926; }
+        .item-info { text-align: left; max-width: 70%; }
+        .item-title { font-weight: bold; font-size: 14px; color: #f1f5f9; }
+        .item-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; line-height: 1.3; }
+        .buy-btn { background: #0f172a; border: 1px solid #e2e8f0; color: #e2e8f0; padding: 8px 14px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .buy-btn:disabled { border-color: #334155; color: #475569; }
+        
+        .code-container { margin-top: 5px; display: flex; gap: 8px; }
+        .code-input { background: #090d16; border: 1px solid #334155; color: #f59e0b; padding: 10px; font-family: monospace; width: 130px; text-align: center; border-radius: 4px; font-size: 14px; }
+        
+        /* HUD Moderna */
+        #hud {
+            position: absolute; top: 15px; left: 15px; right: 15px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%); 
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            padding: 14px; border-radius: 12px; color: #e2e8f0; font-size: 12px; font-family: 'Courier New', monospace;
+            pointer-events: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); display: none;
+            backdrop-filter: blur(8px);
+        }
+        .stat { display: flex; flex-direction: column; justify-content: center; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px; border-left: 3px solid #64748b; }
+        .stat-title { font-size: 10px; color: #94a3b8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
+        .stat span b { font-size: 15px; color: #ffffff; font-family: sans-serif; }
+        
+        .bar-container { background: #334155; width: 100%; height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+        .bar-fill { background: #10b981; width: 100%; height: 100%; transition: width 0.2s, background-color 0.2s; }
+        
+        #stat-money { border-left-color: #f59e0b; }
+        #stat-timer { border-left-color: #ef4444; }
+        #stat-hull { border-left-color: #10b981; }
+        #stat-wind { border-left-color: #38bdf8; }
+        
+        .alert { color: #ef4444 !important; animation: blink 0.8s infinite; text-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* Controles Móveis */
+        .touch-zone { position: absolute; bottom: 30px; display: flex; width: 100%; padding: 0 40px; justify-content: space-between; pointer-events: none; display: none; }
+        .btn-group { display: flex; gap: 20px; pointer-events: auto; }
+        .btn-group-vertical { display: flex; flex-direction: column; gap: 15px; pointer-events: auto; align-items: center; }
+        .btn {
+            width: 76px; height: 76px; background: rgba(30, 41, 59, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 50%;
+            color: white; font-size: 26px; display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(6px); box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            transition: background 0.1s;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.3); border-color: #fff; }
+        
+        #btnProbe { background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.5); width: 84px; height: 84px; font-size: 34px; box-shadow: 0 0 15px rgba(245, 158, 11, 0.1); }
+        #btnProbe:active { background: rgba(245, 158, 11, 0.5); }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <div id="startScreen" class="menu-screen">
+            <h1>STORM CHASERS</h1>
+            <div class="subtitle">REALISTIC METEOROLOGICAL INTERCEPT NETWORK v7.5</div>
+            <button class="menu-btn" onclick="startGame()">INICIAR INTERCEPTAÇÃO</button>
+            <button class="menu-btn" onclick="openShop()">GARAGEM DA EQUIPE</button>
+            <div style="margin-top: 15px; font-size: 12px; color: #94a3b8;">ORÇAMENTO: $<span class="current-money">0</span></div>
+        </div>
+
+        <div id="shopScreen" class="menu-screen" style="display:none;">
+            <h1>GARAGEM DE VEÍCULOS</h1>
+            <div class="subtitle" style="margin-bottom: 10px;">SELECIONE SEU VEÍCULO DE INTERCEPTAÇÃO REALISTA</div>
+            <div style="font-size: 15px; margin-bottom: 15px; color: #f59e0b; font-family: monospace;">FUNDS: $<span class="current-money">0</span></div>
+            
+            <div class="shop-grid">
+                <div class="shop-item owned" id="item-scout">
+                    <div class="item-info">
+                        <div class="item-title">Chevrolet Tahoe (Scout)</div>
+                        <div class="item-desc">Sem garras de ancoragem. Suporta ventos de apenas até 90 MPH.</div>
+                    </div>
+                    <button class="buy-btn" disabled id="btnScoutSelect" onclick="selectVehicle('scout')">SELECIONADO</button>
+                </div>
+                <div class="shop-item" id="item-tiv">
+                    <div class="item-info">
+                        <div class="item-title" style="color:#94a3b8;">TIV-2 (Suporte de Aço Fosco)</div>
+                        <div class="item-desc">Extremamente PESADO e LENTO. Leva 20s para fixar as brocas mecânicas.</div>
+                    </div>
+                    <button class="buy-btn" id="btnBuyTIV" onclick="buyVehicle('tiv', 50000)">$50.000</button>
+                </div>
+                <div class="shop-item" id="item-dom">
+                    <div class="item-info">
+                        <div class="item-title" style="color:#64748b;">Dominator 3 (Blindagem Escura)</div>
+                        <div class="item-desc">Abatimento hidráulico de suspensão rente ao solo. Espetos em 3s.</div>
+                    </div>
+                    <button class="buy-btn" id="btnBuyDOM" onclick="buyVehicle('dom', 50000)">$50.000</button>
+                </div>
+                <div class="shop-item" id="item-dow">
+                    <div class="item-info">
+                        <div class="item-title" style="color:#e2e8f0;">DOW 7 (Caminhão Radar)</div>
+                        <div class="item-desc">Unidade de rastreamento móvel. Ganha orçamento à distância. Suporta até 110 MPH.</div>
+                    </div>
+                    <button class="buy-btn" id="btnBuyDOW" onclick="buyVehicle('dow', 150000)">$150.000</button>
+                </div>
+                <div class="shop-item" id="item-titan">
+                    <div class="item-info">
+                        <div class="item-title" style="color:#e2e8f0;">⚡ TITAN-X Interceptor</div>
+                        <div class="item-desc">Chassis 6x6 blindado com fitas LED estéticas. Suporta ventos de até 260 MPH!</div>
+                    </div>
+                    <button class="buy-btn" id="btnBuyTITAN" onclick="buyVehicle('titan', 300000)">$300.000</button>
+                </div>
+                
+                <div class="shop-item" id="item-titanz" style="display: none; border-color: #d946ef; background: #24122c;">
+                    <div class="item-info">
+                        <div class="item-title" style="color:#f472b6; font-weight: 900; text-shadow: 0 0 10px rgba(244,114,182,0.5);">🛸 TITAN-Z Doomsday-Interceptor</div>
+                        <div class="item-desc" style="color:#fbcfe8;">PROJETO SECRETO 2030. Suporta ventos colossais de até 1000 MPH! Ganha dinheiro à distância via varredura quântica e carrega 10 Sondas!</div>
+                    </div>
+                    <button class="buy-btn" id="btnBuyTITANZ" style="border-color: #d946ef; color:#f472b6;" onclick="buyVehicle('titanz', 1000000)">$1.000.000</button>
+                </div>
+            </div>
+
+            <div class="code-container">
+                <input type="text" id="codeInput" class="code-input" placeholder="CÓDIGO">
+                <button class="buy-btn" onclick="checkCode()">INJETAR</button>
+            </div>
+
+            <button class="menu-btn" style="width:150px; margin-top:10px; border-color:#64748b; color:#64748b;" onclick="closeShop()">VOLTAR</button>
+        </div>
+
+        <div id="hud">
+            <div class="stat" id="stat-money">
+                <div class="stat-title">Orçamento</div>
+                <span>$<b><span id="txtMoney">0</span></b></span>
+            </div>
+            <div class="stat" id="stat-timer">
+                <div class="stat-title">Tempo Tornado</div>
+                <span><b><span id="txtTornadoTime">90s</span></b></span>
+            </div>
+            <div class="stat" id="stat-hull">
+                <div class="stat-title">Blindagem</div>
+                <span><b><span id="txtHull">100</span>%</b></span>
+                <div class="bar-container"><div class="bar-fill" id="hullBar"></div></div>
+            </div>
+            <div class="stat" id="stat-wind">
+                <div class="stat-title">Velocidade Vento</div>
+                <span id="windColor"><b><span id="txtWind">0</span> MPH</b></span>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Sondas Disp.</div>
+                <span>📦 <b><span id="txtProbes">5</span></b></span>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Sistema</div>
+                <span id="anchorStatus" style="font-weight: bold; color: #cbd5e1;">DISPONÍVEL</span>
+            </div>
+        </div>
+
+        <canvas id="ctxCanvas"></canvas>
+
+        <div class="touch-zone" id="controls">
+            <div class="btn-group">
+                <div class="btn" id="btnLeft">⛐</div>
+                <div class="btn" id="btnRight">▶</div>
+            </div>
+            <div class="btn-group-vertical">
+                <div class="btn" id="btnProbe">📡</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('ctxCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Economia
+        let globalMoney = 0;
+        let hasTIV = false; let hasDOM = false; let hasDOW = false; let hasTITAN = false; let hasTITANZ = false;
+        let selectedVehicle = 'scout';
+        let cheatActive = false;
+        let code2030Unlocked = false;
+
+        // Sessão de Jogo
+        let inGame = false;
+        let currentSessionMoney = 0;
+        let probeCount = 5;
+        let carHull = 100;
+        let gameOver = false; let gameWon = false;
+        let gameTimeLeft = 90; 
+        let timerInterval = null;
+        let isNight = false;
+        let lightningAlpha = 0;
+        
+        let spikeProgress = 0; let suspensionDrop = 0; let radarHeight = 0; 
+        const groundY = () => canvas.height - 100;
+
+        let car = { x: 500, y: 0, width: 85, height: 28, vx: 0, vy: 0, maxSpeed: 6, accel: 0.16, friction: 0.05, weight: 2.5, isAnchored: false, angle: 0, rotSpeed: 0 };
+        let currentWindMph = 0;
+        
+        let tornado = { x: -2000, widthBase: 420, widthTop: 1100, speed: 1.5, pullRadius: 1300, opacity: 1, maxWindForce: 300 };
+
+        let probes = [];
+        let particles = [];
+        let rainParticles = [];
+        let debris = [];
+        let houses = [];
+        let trees = []; // Sistema de árvores próximo e ao fundo
+        let textAlerts = []; 
+
+        for(let i=0; i<60; i++) rainParticles.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: 7 + Math.random()*7 });
+
+        // Inputs
+        const input = { left: false, right: false };
+        window.addEventListener('keydown', e => {
+            if(!inGame) return;
+            if(e.key === 'ArrowLeft' || e.key === 'a') input.left = true;
+            if(e.key === 'ArrowRight' || e.key === 'd') input.right = true;
+            if(e.key === ' ') deployProbe();
+        });
+        window.addEventListener('keyup', e => {
+            if(e.key === 'ArrowLeft' || e.key === 'a') input.left = false;
+            if(e.key === 'ArrowRight' || e.key === 'd') input.right = false;
+        });
+
+        const bindTouch = (id, action) => {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); action(true); });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); action(false); });
+        };
+        bindTouch('btnLeft', (val) => input.left = val);
+        bindTouch('btnRight', (val) => input.right = val);
+        document.getElementById('btnProbe').addEventListener('touchstart', (e) => { e.preventDefault(); deployProbe(); });
+
+        function updateMoneyUI() {
+            document.querySelectorAll('.current-money').forEach(el => el.innerText = cheatActive ? "INF" : globalMoney);
+        }
+
+        function openShop() { document.getElementById('startScreen').style.display = 'none'; document.getElementById('shopScreen').style.display = 'flex'; updateMoneyUI(); }
+        function closeShop() { document.getElementById('shopScreen').style.display = 'none'; document.getElementById('startScreen').style.display = 'flex'; }
+        
+        function checkCode() {
+            let code = document.getElementById('codeInput').value;
+            if(code === '2020') {
+                cheatActive = true; globalMoney = Infinity; updateMoneyUI();
+                alert('CHASSIS INTELLIGENCE ENGAGED!');
+                document.getElementById('btnBuyTIV').innerText = "SELECIONAR";
+                document.getElementById('btnBuyDOM').innerText = "SELECIONAR";
+                document.getElementById('btnBuyDOW').innerText = "SELECIONAR";
+                document.getElementById('btnBuyTITAN').innerText = "SELECIONAR";
+                if(code2030Unlocked) document.getElementById('btnBuyTITANZ').innerText = "SELECIONAR";
+            } else if(code === '2030') {
+                code2030Unlocked = true;
+                document.getElementById('item-titanz').style.display = 'flex';
+                alert('⚡ PROJETO CRÍTICO 2030 REVELADO NA GARAGEM! ⚡');
+            } else { alert('CÓDIGO INCORRETO'); }
+        }
+
+        function buyVehicle(type, price) {
+            if(cheatActive || globalMoney >= price) {
+                if(type === 'tiv') { if(!cheatActive && !hasTIV) globalMoney -= price; hasTIV = true; }
+                if(type === 'dom') { if(!cheatActive && !hasDOM) globalMoney -= price; hasDOM = true; }
+                if(type === 'dow') { if(!cheatActive && !hasDOW) globalMoney -= price; hasDOW = true; }
+                if(type === 'titan') { if(!cheatActive && !hasTITAN) globalMoney -= price; hasTITAN = true; }
+                if(type === 'titanz') { if(!cheatActive && !hasTITANZ) globalMoney -= price; hasTITANZ = true; }
+                selectVehicle(type); updateMoneyUI();
+            } else { alert('SALDO INSUFICIENTE!'); }
+        }
+
+        function selectVehicle(type) {
+            if(type === 'tiv' && !hasTIV && !cheatActive) return;
+            if(type === 'dom' && !hasDOM && !cheatActive) return;
+            if(type === 'dow' && !hasDOW && !cheatActive) return;
+            if(type === 'titan' && !hasTITAN && !cheatActive) return;
+            if(type === 'titanz' && !hasTITANZ && !cheatActive) return;
+            selectedVehicle = type;
+            document.getElementById('item-scout').className = type === 'scout' ? 'shop-item owned' : 'shop-item';
+            document.getElementById('item-tiv').className = type === 'tiv' ? 'shop-item owned' : 'shop-item';
+            document.getElementById('item-dom').className = type === 'dom' ? 'shop-item owned' : 'shop-item';
+            document.getElementById('item-dow').className = type === 'dow' ? 'shop-item owned' : 'shop-item';
+            document.getElementById('item-titan').className = type === 'titan' ? 'shop-item owned' : 'shop-item';
+            document.getElementById('item-titanz').className = type === 'titanz' ? 'shop-item owned' : 'shop-item';
+            
+            document.getElementById('btnScoutSelect').innerText = type === 'scout' ? "SELECIONADO" : "SELECIONAR";
+            document.getElementById('btnScoutSelect').disabled = type === 'scout';
+            if(hasTIV || cheatActive) document.getElementById('btnBuyTIV').innerText = type === 'tiv' ? "SELECIONADO" : "SELECIONAR";
+            if(hasDOM || cheatActive) document.getElementById('btnBuyDOM').innerText = type === 'dom' ? "SELECIONADO" : "SELECIONAR";
+            if(hasDOW || cheatActive) document.getElementById('btnBuyDOW').innerText = type === 'dow' ? "SELECIONADO" : "SELECIONAR";
+            if(hasTITAN || cheatActive) document.getElementById('btnBuyTITAN').innerText = type === 'titan' ? "SELECIONADO" : "SELECIONAR";
+            if(hasTITANZ || cheatActive) document.getElementById('btnBuyTITANZ').innerText = type === 'titanz' ? "SELECIONADO" : "SELECIONAR";
+        }
+
+        // MAIS CASAS (PERTO/FUNDO) E ÁRVORES DINÂMICAS
+        function generateScenery() {
+            houses = [];
+            trees = [];
+            let currentX = 50;
+            
+            // Gerar 45 casas bem mais próximas e integradas ao cenário de fundo/perto
+            for(let i = 0; i < 45; i++) {
+                currentX += 60 + Math.random() * 140; // Espaçamento bem menor (mais perto uma da outra)
+                let depth = Math.random() < 0.6 ? 'fundo' : 'perto';
+                houses.push({
+                    x: currentX, 
+                    w: depth === 'fundo' ? 30 + Math.random() * 15 : 45 + Math.random() * 20, 
+                    h: depth === 'fundo' ? 22 + Math.random() * 12 : 35 + Math.random() * 20, 
+                    isDestroyed: false,
+                    depth: depth,
+                    color: ['#475569', '#334155', '#1e293b', '#7f1d1d', '#14532d'][Math.floor(Math.random() * 5)]
+                });
+
+                // Adiciona árvores perto das casas para preencher o ambiente
+                if (Math.random() < 0.7) {
+                    trees.push({
+                        x: currentX + (Math.random() * 40 - 20),
+                        h: 25 + Math.random() * 25,
+                        sway: 0,
+                        isSnapped: false,
+                        depth: depth
+                    });
+                }
+            }
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('hud').style.display = 'grid';
+            document.getElementById('controls').style.display = 'flex';
+            
+            isNight = Math.random() < 0.5; 
+            generateScenery();
+
+            let mphAleatorio = Math.floor(Math.random() * (30 - 10 + 1)) + 10;
+            tornado.speed = mphAleatorio / 10; 
+
+            // Curva de probabilidade de intensidade do Tornado
+            let seed = Math.random(); 
+            if (seed < 0.50) {
+                tornado.maxWindForce = Math.floor(Math.random() * (250 - 90 + 1)) + 90;
+            } else if (seed < 0.85) {
+                tornado.maxWindForce = Math.floor(Math.random() * (550 - 251 + 1)) + 251;
+            } else if (seed < 0.97) {
+                tornado.maxWindForce = Math.floor(Math.random() * (800 - 551 + 1)) + 551;
+            } else {
+                tornado.maxWindForce = Math.floor(Math.random() * (1000 - 801 + 1)) + 801;
+                textAlerts.push({ x: canvas.width / 2, y: canvas.height / 2 - 100, text: "🚨 ALERTA MÁXIMO: TEMPESTADE HISTÓRICA DETECTADA! 🚨", alpha: 2.5 });
+            }
+
+            // Atribuição de Atributos por Veículo
+            if(selectedVehicle === 'tiv') { car.width = 95; car.height = 30; car.maxSpeed = 3.2; car.accel = 0.05; car.weight = 8.5; probeCount = 5; } 
+            else if(selectedVehicle === 'dom') { car.width = 90; car.height = 28; car.maxSpeed = 8.5; car.accel = 0.22; car.weight = 6.0; probeCount = 5; } 
+            else if(selectedVehicle === 'dow') { car.width = 100; car.height = 34; car.maxSpeed = 10.0; car.accel = 0.28; car.weight = 4.2; probeCount = 5; } 
+            else if(selectedVehicle === 'titan') { car.width = 110; car.height = 38; car.maxSpeed = 7.5; car.accel = 0.20; car.weight = 12.0; probeCount = 5; } 
+            else if(selectedVehicle === 'titanz') { car.width = 115; car.height = 40; car.maxSpeed = 9.0; car.accel = 0.25; car.weight = 25.0; probeCount = 10; } // CARRO NOVO CAPACIDADE 10 PROBES
+            else { car.width = 80; car.height = 28; car.maxSpeed = 6.0; car.accel = 0.12; car.weight = 2.4; probeCount = 5; }
+            
+            document.getElementById('txtProbes').innerText = probeCount;
+
+            inGame = true; gameOver = false; gameWon = false; currentSessionMoney = 0; currentWindMph = 0;
+            car.x = 850; car.vx = 0; car.vy = 0; car.angle = 0; car.rotSpeed = 0;
+            car.y = groundY() - car.height;
+            tornado.x = -2200; tornado.opacity = 1; probes = []; debris = []; textAlerts = [];
+            spikeProgress = 0; suspensionDrop = 0; radarHeight = 0; gameTimeLeft = 90;
+
+            document.getElementById('txtTornadoTime').innerText = gameTimeLeft + "s";
+            document.getElementById('txtTornadoTime').className = "";
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if(inGame && !gameOver && !gameWon) {
+                    gameTimeLeft--; document.getElementById('txtTornadoTime').innerText = gameTimeLeft + "s";
+                    if(gameTimeLeft <= 15) document.getElementById('txtTornadoTime').className = "alert";
+                    if(gameTimeLeft <= 0) { gameWon = true; clearInterval(timerInterval); if(!cheatActive) globalMoney += currentSessionMoney; }
+                }
+            }, 1000);
+        }
+
+        function deployProbe() {
+            if(probeCount > 0 && !gameOver && !gameWon && inGame) {
+                probeCount--; 
+                document.getElementById('txtProbes').innerText = probeCount;
+
+                let safetyFactor = Math.max(0, 1 - (currentWindMph / 1200));
+                let successChance = selectedVehicle === 'titanz' ? 0.99 : 0.05 + (safetyFactor * 0.95); // TITAN-Z quase nunca perde sonda
+
+                if (Math.random() <= successChance) {
+                    probes.push({ x: car.x + car.width / 2, y: groundY() - 3, radius: 6, inTornado: false, pulseAnim: 0 });
+                } else {
+                    textAlerts.push({ x: car.x + car.width / 2, y: car.y - 15, text: "❌ PROBE LOST (WIND TOO HIGH)", alpha: 1.0 });
+                }
+            }
+        }
+
+        let showWindWarning = false;
+
+        function update() {
+            if (!inGame) {
+                rainParticles.forEach(r => { r.y += r.s; r.x -= 4; if(r.y > canvas.height) { r.y = 0; r.x = Math.random()*canvas.width; } });
+                return;
+            }
+
+            if (gameWon) {
+                tornado.x += 0.5; tornado.opacity -= 0.01; if(tornado.opacity < 0) tornado.opacity = 0;
+                car.vx = 2; car.x += car.vx; car.angle = 0; return;
+            }
+
+            if (gameOver) return;
+
+            if (isNight && Math.random() < 0.01) lightningAlpha = 0.6 + Math.random() * 0.4;
+            if (lightningAlpha > 0) lightningAlpha -= 0.04;
+
+            let onGround = car.y >= groundY() - car.height + suspensionDrop;
+
+            // Ativação das garras mecânicas/Radar
+            if (selectedVehicle !== 'scout' && input.left && Math.abs(car.vx) < 0.6 && onGround) {
+                car.isAnchored = true; car.vx = 0;
+                if(selectedVehicle === 'tiv') { if(spikeProgress < 100) spikeProgress += 0.083; } 
+                else if(selectedVehicle === 'dom') { if(spikeProgress < 100) spikeProgress += 0.55; if(suspensionDrop < 6) suspensionDrop += 0.2; } 
+                else if(selectedVehicle === 'dow') { if(radarHeight < 14) radarHeight += 0.4; spikeProgress = 100; } 
+                else if(selectedVehicle === 'titan' || selectedVehicle === 'titanz') { if(spikeProgress < 100) spikeProgress += 0.85; if(selectedVehicle === 'titanz' && radarHeight < 12) radarHeight += 0.5; }
+
+                let pct = Math.floor(spikeProgress);
+                if(selectedVehicle === 'dow') document.getElementById('anchorStatus').innerHTML = `<span style='color:#e2e8f0; font-weight:bold;'>RADAR ATIVO</span>`;
+                else if(selectedVehicle === 'titanz') document.getElementById('anchorStatus').innerHTML = pct < 100 ? `<span style='color:#d946ef;'>QUANTUM: ${pct}%</span>` : `<span style='color:#f472b6; font-weight:bold;'>🛸 DOOMSDAY ANCHOR</span>`;
+                else if(selectedVehicle === 'titan') document.getElementById('anchorStatus').innerHTML = pct < 100 ? `<span style='color:#00ffff;'>GARRAS: ${pct}%</span>` : `<span style='color:#00ffff; font-weight:bold;'>🔒 TITAN FIXADO</span>`;
+                else document.getElementById('anchorStatus').innerHTML = pct < 100 ? `<span style='color:#f59e0b;'>BROCAS: ${pct}%</span>` : `<span style='color:#10b981; font-weight:bold;'>FIXADO 100%</span>`;
+            } else {
+                car.isAnchored = false;
+                if(spikeProgress > 0) spikeProgress -= 2.0; if(suspensionDrop > 0) suspensionDrop -= 0.3; if(radarHeight > 0) radarHeight -= 0.5;
+                if(spikeProgress < 0) spikeProgress = 0; if(suspensionDrop < 0) suspensionDrop = 0; if(radarHeight < 0) radarHeight = 0;
+                document.getElementById('anchorStatus').innerHTML = `<span style='color:#94a3b8;'>DISPONÍVEL</span>`;
+                
+                if (onGround) {
+                    if (input.left) car.vx -= car.accel; 
+                    if (input.right) car.vx += car.accel;
+                }
+            }
+
+            if (onGround) {
+                car.vx *= (1 - car.friction); 
+                if(Math.abs(car.vx) > car.maxSpeed) car.vx = Math.sign(car.vx) * car.maxSpeed;
+            }
+            car.x += car.vx;
+            if(car.x < 30) car.x = 30; if(car.x > canvas.width - car.width - 30) car.x = canvas.width - car.width - 30;
+
+            tornado.x += tornado.speed;
+            let distanceToTornado = (car.x + car.width/2) - tornado.x;
+
+            // Destruição das Casas e Árvores com o passar do Tornado
+            houses.forEach(h => {
+                let centerHouse = h.x + h.w / 2;
+                if (!h.isDestroyed && Math.abs(centerHouse - tornado.x) < tornado.widthBase / 1.1) {
+                    h.isDestroyed = true;
+                    for(let k = 0; k < 4; k++) debris.push({ x: h.x + Math.random() * h.w, y: groundY() - 20, size: 4 + Math.random() * 6, vx: (Math.random() * 6) + 2, vy: -7 - Math.random() * 8 });
+                }
+            });
+
+            trees.forEach(t => {
+                let dist = t.x - tornado.x;
+                if (!t.isSnapped && Math.abs(dist) < tornado.pullRadius) {
+                    let force = (1 - (Math.abs(dist) / tornado.pullRadius));
+                    t.sway = (dist > 0 ? -1 : 1) * force * 0.9;
+                    if (Math.abs(dist) < tornado.widthBase / 1.2 && Math.random() < 0.05) {
+                        t.isSnapped = true;
+                        debris.push({ x: t.x, y: groundY() - t.h, size: 5, vx: (Math.random() * 5) + 3, vy: -5 });
+                    }
+                }
+            });
+
+            showWindWarning = false; 
+
+            // Vento Dinâmico e Impacto no Carro
+            if (distanceToTornado < tornado.pullRadius && distanceToTornado > -300) {
+                let forceFactor = (1 - (distanceToTornado / tornado.pullRadius));
+                if(forceFactor < 0) forceFactor = 0;
+                
+                currentWindMph = Math.floor(25 + (forceFactor * (tornado.maxWindForce - 25))); 
+                document.getElementById('txtWind').innerText = currentWindMph;
+                document.getElementById('windColor').className = currentWindMph > (tornado.maxWindForce * 0.7) ? "alert" : "";
+
+                if(selectedVehicle === 'scout' && currentWindMph > 80) showWindWarning = true;
+                if(selectedVehicle === 'dow' && currentWindMph > 95) showWindWarning = true;
+                if(selectedVehicle === 'titan' && currentWindMph > 240) showWindWarning = true;
+                if(selectedVehicle === 'titanz' && currentWindMph > 900) showWindWarning = true;
+
+                let damageMultiplier = currentWindMph / 250; 
+                if(selectedVehicle === 'scout' && currentWindMph > 90) carHull -= 0.18 * damageMultiplier; 
+                
+                // SISTEMA DO DOW E TITAN-Z: GANHAR DINHEIRO DE LONGE VIA RADAR
+                if(selectedVehicle === 'dow') {
+                    let maxAllowedWind = (radarHeight >= 14) ? 110 : 100;
+                    if(currentWindMph > maxAllowedWind) carHull -= 0.6 * damageMultiplier;
+                    currentSessionMoney += 1; document.getElementById('txtMoney').innerText = currentSessionMoney;
+                }
+                if(selectedVehicle === 'titanz') {
+                    // TITAN-Z gera muito orçamento por segundo via scanner quântico à distância
+                    currentSessionMoney += 4; document.getElementById('txtMoney').innerText = currentSessionMoney;
+                    if(!car.isAnchored && currentWindMph > 350) carHull -= 0.02 * damageMultiplier; // Solto toma dano leve em vento muito bruto
+                }
+
+                if(selectedVehicle === 'titan' && car.isAnchored && spikeProgress >= 100) {
+                    if(currentWindMph > 260) carHull -= 0.10 * damageMultiplier;
+                } else if(selectedVehicle === 'titan' && currentWindMph > 140) { carHull -= 0.15 * damageMultiplier; }
+
+                let spikeFactor = 1 + ((spikeProgress / 100) * 9);
+                if(selectedVehicle === 'dom') spikeFactor *= 1.4;
+                if(selectedVehicle === 'titan') spikeFactor *= 2.5; 
+                if(selectedVehicle === 'titanz') spikeFactor *= 6.0; // Garras quânticas mega pesadas do TITAN-Z
+                
+                let currentWeight = car.isAnchored ? (car.weight * spikeFactor) : car.weight;
+                car.x -= (forceFactor * 10.5 * damageMultiplier) / currentWeight;
+
+                // Centro do Funil do Tornado
+                if (distanceToTornado < tornado.widthBase / 2) {
+                    let dmg = 0.18;
+                    if (selectedVehicle === 'scout') dmg = 4.5;
+                    else if (selectedVehicle === 'dom') dmg = 0.10;
+                    else if (selectedVehicle === 'dow') dmg = 3.8;
+                    else if (selectedVehicle === 'titan') dmg = 0.04;
+                    else if (selectedVehicle === 'titanz') dmg = 0.001; // TITAN-Z tanka o núcleo facilmente até 1000MPH
+                    
+                    carHull -= 0.4 * dmg * damageMultiplier;
+                    
+                    if(!car.isAnchored || spikeProgress < 100) {
+                        car.vy -= (3.8 * damageMultiplier) / car.weight;
+                        car.x += (Math.random() - 0.5) * 18;
+                        if(car.rotSpeed === 0) car.rotSpeed = (Math.random() - 0.5) * 0.22; 
+                    }
+                } else {
+                    if(!onGround) car.vy += 0.5;
+                }
+            } else {
+                currentWindMph = 22; document.getElementById('txtWind').innerText = "22"; document.getElementById('windColor').className = "";
+                if(!onGround) car.vy += 0.5;
+            }
+
+            car.y += car.vy;
+            car.angle += car.rotSpeed;
+
+            if(car.y >= groundY() - car.height + suspensionDrop) {
+                car.y = groundY() - car.height + suspensionDrop;
+                car.vy = 0;
+                if(car.angle !== 0) {
+                    if(Math.abs(car.angle) > 0.5) carHull -= selectedVehicle === 'titanz' ? 1 : 12; 
+                    car.angle = 0; car.rotSpeed = 0;
+                }
+            }
+
+            if(carHull <= 0) { carHull = 0; gameOver = true; clearInterval(timerInterval); if(!cheatActive) globalMoney += currentSessionMoney; }
+            
+            document.getElementById('txtHull').innerText = Math.floor(carHull);
+            const hb = document.getElementById('hullBar');
+            if(hb) {
+                hb.style.width = carHull + "%";
+                if(carHull > 50) hb.style.backgroundColor = "#10b981";
+                else if(carHull > 20) hb.style.backgroundColor = "#f59e0b";
+                else hb.style.backgroundColor = "#ef4444";
+            }
+
+            // Destroços voadores
+            if(Math.random() < 0.08 && debris.length < 35) debris.push({ x: tornado.x + (Math.random() * 300) - 150, y: groundY() - 20, size: 5+Math.random()*10, vx: 4+Math.random()*6, vy: -6-Math.random()*8 });
+            debris.forEach((d, idx) => {
+                d.vy += 0.24; d.x += d.vx; d.y += d.vy;
+                if(d.x > car.x && d.x < car.x + car.width && d.y > car.y && d.y < car.y + car.height) {
+                    if((selectedVehicle === 'titan' || selectedVehicle === 'titanz') && car.isAnchored && spikeProgress >= 100) {
+                        currentSessionMoney += selectedVehicle === 'titanz' ? 60 : 25; 
+                        document.getElementById('txtMoney').innerText = currentSessionMoney;
+                    } else {
+                        carHull -= (selectedVehicle === 'scout' || selectedVehicle === 'dow') ? 7 : 1.0;
+                    }
+                    debris.splice(idx, 1);
+                }
+                if(d.y > canvas.height || d.x > canvas.width) debris.splice(idx, 1);
+            });
+
+            // Coleta de dados das sondas fixadas
+            probes.forEach((p) => {
+                p.pulseAnim += 0.1;
+                let pDistToTornado = p.x - tornado.x;
+                if(Math.abs(pDistToTornado) < tornado.widthBase * 1.5) {
+                    p.inTornado = true; currentSessionMoney += selectedVehicle === 'titanz' ? 30 : 15; 
+                    document.getElementById('txtMoney').innerText = currentSessionMoney;
+                } else { p.inTornado = false; }
+            });
+
+            textAlerts.forEach((a, idx) => {
+                if (a.text.includes("🚨")) a.alpha -= 0.005;
+                else { a.y -= 0.8; a.alpha -= 0.015; }
+                if(a.alpha <= 0) textAlerts.splice(idx, 1);
+            });
+
+            if(particles.length < 550) particles.push({ heightY: Math.random() * canvas.height, angle: Math.random() * Math.PI * 2, rotSpeed: 0.03 + Math.random()*0.04, size: 4 + Math.random()*12 });
+            rainParticles.forEach(r => { r.y += r.s; r.x -= 15; if(r.y > canvas.height) { r.y = 0; r.x = Math.random()*canvas.width; } });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            if (isNight) {
+                let nColor = Math.floor(8 + lightningAlpha * 40);
+                sky.addColorStop(0, `rgb(${nColor-4}, ${nColor-2}, ${nColor+5})`); sky.addColorStop(1, '#020205');
+            } else {
+                sky.addColorStop(0, '#040507'); sky.addColorStop(0.6, '#0d1015'); sky.addColorStop(1, '#08090c');
+            }
+            ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = isNight ? 'rgba(255, 255, 255, 0.08)' : 'rgba(130, 155, 185, 0.16)'; ctx.lineWidth = 1;
+            rainParticles.forEach(r => { ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - 15, r.y + r.s); ctx.stroke(); });
+
+            // RENDER DAS CASAS (FUNDO E PERTO)
+            houses.forEach(h => {
+                ctx.fillStyle = h.color;
+                let baseline = h.depth === 'fundo' ? groundY() - 8 : groundY();
+                if (!h.isDestroyed) {
+                    ctx.fillRect(h.x, baseline - h.h, h.w, h.h); ctx.fillStyle = '#450a0a';
+                    ctx.beginPath(); ctx.moveTo(h.x - 3, baseline - h.h); ctx.lineTo(h.x + h.w / 2, baseline - h.h - 12); ctx.lineTo(h.x + h.w + 3, baseline - h.h); ctx.closePath(); ctx.fill();
+                } else { 
+                    ctx.fillStyle = '#292524'; ctx.fillRect(h.x, baseline - 6, h.w, 6); 
+                }
+            });
+
+            // RENDER DAS ÁRVORES
+            trees.forEach(t => {
+                let baseline = t.depth === 'fundo' ? groundY() - 8 : groundY();
+                ctx.save();
+                ctx.translate(t.x, baseline);
+                ctx.rotate(t.sway);
+                if(!t.isSnapped) {
+                    // Tronco
+                    ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -t.h, 6, t.h);
+                    // Folhas
+                    ctx.fillStyle = t.depth === 'fundo' ? '#14321a' : '#1e4620';
+                    ctx.beginPath(); ctx.arc(0, -t.h, t.h * 0.4, 0, Math.PI * 2); ctx.fill();
+                } else {
+                    // Tronco quebrado
+                    ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -8, 6, 8);
+                }
+                ctx.restore();
+            });
+
+            // Sondas Terrestres
+            probes.forEach(p => {
+                ctx.strokeStyle = p.inTornado ? 'rgba(234, 88, 12, 0.4)' : 'rgba(100, 116, 139, 0.3)'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + (Math.sin(p.pulseAnim) * 8 + 8), 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = p.inTornado ? '#ea580c' : '#475569'; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = p.inTornado ? '#ef4444' : '#10b981'; ctx.beginPath(); ctx.arc(p.x, p.y - 2, 2, 0, Math.PI * 2); ctx.fill();
+            });
+
+            // Tornado
+            if (inGame && tornado.opacity > 0) {
+                particles.forEach(p => {
+                    p.angle += p.rotSpeed;
+                    let heightFactor = (groundY() - p.heightY) / groundY(); if (heightFactor < 0) heightFactor = 0;
+                    let currentRadius = tornado.widthBase + (tornado.widthTop - tornado.widthBase) * heightFactor;
+                    let posX = tornado.x + Math.sin(p.angle) * currentRadius;
+                    let baseVisibility = isNight ? (0.05 + lightningAlpha * 0.4) : (0.22 + (heightFactor * 0.28));
+                    ctx.fillStyle = `rgba(32, 35, 41, ${baseVisibility * tornado.opacity})`;
+                    ctx.beginPath(); ctx.arc(posX, p.heightY, p.size * (1.2 + heightFactor * 5.0), 0, Math.PI*2); ctx.fill();
+                });
+            }
+
+            // Estrada / Solo principal
+            ctx.fillStyle = '#050608'; ctx.fillRect(0, groundY(), canvas.width, 100);
+            ctx.fillStyle = '#141822'; ctx.fillRect(0, groundY(), canvas.width, 10);
+            ctx.fillStyle = 'rgba(212, 175, 55, 0.25)';
+            for(let i=0; i<canvas.width; i+=90) ctx.fillRect(i, groundY() + 45, 40, 4);
+
+            if (!inGame) return;
+
+            ctx.fillStyle = '#292524'; debris.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI*2); ctx.fill(); });
+
+            if(showWindWarning && Math.floor(Date.now() / 250) % 2 === 0) {
+                ctx.fillStyle = '#ef4444'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+                ctx.fillText('⚠️ ALERTA: ESTRUTURA EXPONENCIALMENTE SOBRECARREGADA ⚠️', car.x + car.width/2, car.y - 18);
+            }
+
+            textAlerts.forEach(a => {
+                if (a.text.includes("🚨")) ctx.fillStyle = `rgba(239, 68, 68, ${Math.min(1, a.alpha)})`;
+                else ctx.fillStyle = `rgba(239, 68, 68, ${a.alpha})`;
+                ctx.font = a.text.includes("🚨") ? 'bold 18px sans-serif' : 'bold 11px sans-serif';
+                ctx.textAlign = 'center'; ctx.fillText(a.text, a.x, a.y);
+            });
+
+            // RENDER DO CARRO COM MATRIZ DE ROTAÇÃO
+            ctx.save();
+            ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
+            ctx.rotate(car.angle);
+            ctx.translate(-(car.width / 2), -(car.height / 2));
+
+            if (spikeProgress > 0) {
+                let ext = (spikeProgress / 100);
+                if (selectedVehicle === 'titanz') {
+                    ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = '#d946ef'; ctx.fillStyle = '#d946ef';
+                    ctx.fillRect(10, car.height - 2, 8, ext * 18); ctx.fillRect(car.width - 18, car.height - 2, 8, ext * 18); ctx.restore();
+                } else if (selectedVehicle === 'titan') {
+                    ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.fillStyle = '#00ffff';
+                    ctx.fillRect(8, car.height - 2, 6, ext * 15); ctx.fillRect(car.width - 14, car.height - 2, 6, ext * 15); ctx.restore();
+                } else if(selectedVehicle === 'tiv' || selectedVehicle === 'dom') {
+                    ctx.fillStyle = '#334155'; ctx.fillRect(5, car.height - 2, 7, ext * 14); ctx.fillRect(car.width - 12, car.height - 2, 7, ext * 14);
+                }
+            }
+
+            // Design Visual de Cada Carro
+            if(selectedVehicle === 'tiv') {
+                let bodyGrad = ctx.createLinearGradient(0, 0, 0, car.height); bodyGrad.addColorStop(0, '#475569'); bodyGrad.addColorStop(1, '#334155');
+                ctx.fillStyle = bodyGrad; ctx.beginPath(); ctx.moveTo(0, car.height); ctx.lineTo(28, 4); ctx.lineTo(car.width - 12, 4); ctx.lineTo(car.width, car.height); ctx.closePath(); ctx.fill();
+            } else if(selectedVehicle === 'dom') {
+                let domGrad = ctx.createLinearGradient(0, 0, 0, car.height); domGrad.addColorStop(0, '#1c1d22'); domGrad.addColorStop(1, '#0f1013');
+                ctx.fillStyle = domGrad; ctx.beginPath(); ctx.moveTo(0, car.height); ctx.quadraticCurveTo(32, -1 - (suspensionDrop*0.5), car.width - 10, 8); ctx.lineTo(car.width, car.height); ctx.closePath(); ctx.fill();
+            } else if(selectedVehicle === 'dow') {
+                let dowGrad = ctx.createLinearGradient(0, 0, 0, car.height); dowGrad.addColorStop(0, '#f8fafc'); dowGrad.addColorStop(1, '#cbd5e1');
+                ctx.fillStyle = dowGrad; ctx.fillRect(0, 10, car.width, car.height - 10);
+                ctx.save(); ctx.translate(car.width / 2, 10 - radarHeight); ctx.fillStyle = '#475569'; ctx.fillRect(-2, 0, 4, radarHeight + 4); 
+                ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.arc(0, 0, 13, Math.PI, 0); ctx.fill(); ctx.restore();
+            } else if(selectedVehicle === 'titan') {
+                let titanGrad = ctx.createLinearGradient(0, 0, car.width, car.height); titanGrad.addColorStop(0, '#2d3748'); titanGrad.addColorStop(1, '#0d1117');
+                ctx.fillStyle = titanGrad; ctx.beginPath(); ctx.moveTo(0, car.height - 4); ctx.lineTo(15, 9); ctx.lineTo(45, 3); ctx.lineTo(car.width - 20, 3); ctx.lineTo(car.width, car.height - 6); ctx.lineTo(car.width, car.height); ctx.lineTo(0, car.height); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(8, car.height - 10); ctx.lineTo(car.width - 12, car.height - 10); ctx.stroke();
+            } else if(selectedVehicle === 'titanz') {
+                // APARÊNCIA DO TITAN-Z DOOMSDAY
+                let tzGrad = ctx.createLinearGradient(0, 0, car.width, car.height); tzGrad.addColorStop(0, '#4a044e'); tzGrad.addColorStop(0.5, '#1e012a'); tzGrad.addColorStop(1, '#000000');
+                ctx.fillStyle = tzGrad; ctx.beginPath(); ctx.moveTo(0, car.height); ctx.lineTo(12, 12); ctx.lineTo(40, 2); ctx.lineTo(car.width - 30, 2); ctx.lineTo(car.width, car.height - 4); ctx.closePath(); ctx.fill();
+                // Linha Neon Magenta/Rosa Estética
+                ctx.strokeStyle = '#d946ef'; ctx.lineWidth = 3; ctx.save(); ctx.shadowBlur = 8; ctx.shadowColor = '#d946ef'; ctx.beginPath(); ctx.moveTo(4, car.height - 12); ctx.lineTo(car.width - 4, car.height - 12); ctx.stroke(); ctx.restore();
+                // Prato Antena Quântica superior que sobe na ancoragem
+                ctx.save(); ctx.translate(car.width / 2 + 15, 10 - radarHeight); ctx.fillStyle = '#d946ef'; ctx.fillRect(-1.5, 0, 3, radarHeight);
+                ctx.fillStyle = '#f472b6'; ctx.beginPath(); ctx.arc(0, 0, 9, Math.PI, 0); ctx.fill(); ctx.restore();
+            } else {
+                let scoutGrad = ctx.createLinearGradient(0, 0, 0, car.height); scoutGrad.addColorStop(0, '#991b1b'); scoutGrad.addColorStop(1, '#7f1d1d');
+                ctx.fillStyle = scoutGrad; ctx.fillRect(0, 8, car.width - 25, car.height - 8); ctx.fillRect(car.width - 25, 14, 25, car.height - 14);
+            }
+
+            // Rodas (Eixo Duplo e Triplo conforme peso)
+            let rDrop = (selectedVehicle === 'dom' ? suspensionDrop : 0);
+            if (selectedVehicle === 'titan' || selectedVehicle === 'titanz') {
+                let wColor = selectedVehicle === 'titanz' ? '#d946ef' : '#64748b';
+                [18, 54, car.width - 20].forEach(wheelX => {
+                    ctx.fillStyle = '#111317'; ctx.beginPath(); ctx.arc(wheelX, car.height, 9, 0, Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle = wColor; ctx.beginPath(); ctx.arc(wheelX, car.height, 4, 0, Math.PI*2); ctx.fill(); 
+                });
+            } else {
+                [18, car.width - 22].forEach(wheelX => {
+                    ctx.fillStyle = '#151b26'; ctx.beginPath(); ctx.arc(wheelX, car.height - rDrop, 8, 0, Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(wheelX, car.height - rDrop, 3, 0, Math.PI*2); ctx.fill(); 
+                });
+            }
+
+            let light = ctx.createLinearGradient(0, 14, -200, 14); light.addColorStop(0, isNight ? 'rgba(254, 240, 138, 0.5)' : 'rgba(255, 255, 255, 0.25)'); light.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = light; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(-210, -25); ctx.lineTo(-210, 55); ctx.closePath(); ctx.fill();
+            
+            ctx.restore();
+
+            // Telas de Fim de Jogo
+            if(gameWon) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#10b981'; ctx.font = 'bold 26px Segoe UI'; ctx.textAlign = 'center';
+                ctx.fillText('PARABÉNS! MISSÃO CUMPRIDA!', canvas.width/2, canvas.height/2 - 30);
+                ctx.fillStyle = '#fff'; ctx.font = '15px Segoe UI';
+                ctx.fillText(`O tornado dissipou. Dados salvos com sucesso!`, canvas.width/2, canvas.height/2 + 5);
+                ctx.fillStyle = '#f59e0b'; ctx.fillText(`FINANCIAMENTO ADQUIRIDO: +$${currentSessionMoney}`, canvas.width/2, canvas.height/2 + 35);
+                ctx.fillStyle = '#64748b'; ctx.font = '12px monospace'; ctx.fillText('Clique na tela para retornar ao QG', canvas.width/2, canvas.height/2 + 85);
+            }
+
+            if(gameOver) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.93)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ef4444'; ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center';
+                ctx.fillText('VEÍCULO DESTRUÍDO PELA FORÇA DA TEMPESTADE', canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = '#fff'; ctx.font = '15px Segoe UI'; ctx.fillText(`Orçamento coletado pelas sondas: +$${currentSessionMoney}`, canvas.width/2, canvas.height/2 + 15);
+                ctx.fillStyle = '#64748b'; ctx.font = '12px monospace'; ctx.fillText('Clique na tela para retornar ao QG', canvas.width/2, canvas.height/2 + 65);
+            }
+        }
+
+        function returnToMenu() {
+            if(gameOver || gameWon) {
+                inGame = false; gameOver = false; gameWon = false;
+                document.getElementById('hud').style.display = 'none'; document.getElementById('controls').style.display = 'none';
+                document.getElementById('startScreen').style.display = 'flex'; updateMoneyUI();
+            }
+        }
+        window.addEventListener('touchstart', returnToMenu); window.addEventListener('click', returnToMenu);
+
+        function engineLoop() { update(); draw(); requestAnimationFrame(engineLoop); }
+        engineLoop();
+    </script>
+</body>
+</html>
+
