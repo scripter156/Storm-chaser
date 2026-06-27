@@ -86,7 +86,7 @@
     <div id="gameContainer">
         <div id="startScreen" class="menu-screen">
             <h1>STORM CHASERS</h1>
-            <div class="subtitle">REALISTIC METEOROLOGICAL INTERCEPT NETWORK v7.5</div>
+            <div class="subtitle">REALISTIC METEOROLOGICAL INTERCEPT NETWORK v7.6</div>
             <button class="menu-btn" onclick="startGame()">INICIAR INTERCEPTAÇÃO</button>
             <button class="menu-btn" onclick="openShop()">GARAGEM DA EQUIPE</button>
             <div style="margin-top: 15px; font-size: 12px; color: #94a3b8;">ORÇAMENTO: $<span class="current-money">0</span></div>
@@ -134,7 +134,6 @@
                     <button class="buy-btn" id="btnBuyTITAN" onclick="buyVehicle('titan', 300000)">$300.000</button>
                 </div>
                 
-                <!-- NOVO CARRO SECRETO CÓDIGO 2030 -->
                 <div class="shop-item" id="item-titanz" style="display: none; border-color: #d946ef; background: #24122c;">
                     <div class="item-info">
                         <div class="item-title" style="color:#f472b6; font-weight: 900; text-shadow: 0 0 10px rgba(244,114,182,0.5);">🛸 TITAN-Z Doomsday-Interceptor</div>
@@ -237,10 +236,10 @@
 
         for(let i=0; i<60; i++) rainParticles.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: 7 + Math.random()*7 });
 
-        // Inputs
+        // Inputs Mundiais corrigidos
         const input = { left: false, right: false };
         window.addEventListener('keydown', e => {
-            if(!inGame) return;
+            if(!inGame || gameOver || gameWon) return;
             if(e.key === 'ArrowLeft' || e.key === 'a') input.left = true;
             if(e.key === 'ArrowRight' || e.key === 'd') input.right = true;
             if(e.key === ' ') deployProbe();
@@ -250,14 +249,20 @@
             if(e.key === 'ArrowRight' || e.key === 'd') input.right = false;
         });
 
+        // Eventos Touch Mobile blindados contra cliques fantasmas
         const bindTouch = (id, action) => {
             const el = document.getElementById(id);
-            el.addEventListener('touchstart', (e) => { e.preventDefault(); action(true); });
-            el.addEventListener('touchend', (e) => { e.preventDefault(); action(false); });
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); action(true); }, { passive: false });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); action(false); }, { passive: false });
         };
         bindTouch('btnLeft', (val) => input.left = val);
         bindTouch('btnRight', (val) => input.right = val);
-        document.getElementById('btnProbe').addEventListener('touchstart', (e) => { e.preventDefault(); deployProbe(); });
+        
+        document.getElementById('btnProbe').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            deployProbe(); 
+        }, { passive: false });
 
         function updateMoneyUI() {
             document.querySelectorAll('.current-money').forEach(el => el.innerText = cheatActive ? "INF" : globalMoney);
@@ -318,10 +323,7 @@
         }
 
         function generateScenery() {
-            houses = [];
-            trees = [];
-            let currentX = 50;
-            
+            houses = []; trees = []; let currentX = 50;
             for(let i = 0; i < 45; i++) {
                 currentX += 60 + Math.random() * 140; 
                 let depth = Math.random() < 0.6 ? 'fundo' : 'perto';
@@ -329,19 +331,11 @@
                     x: currentX, 
                     w: depth === 'fundo' ? 30 + Math.random() * 15 : 45 + Math.random() * 20, 
                     h: depth === 'fundo' ? 22 + Math.random() * 12 : 35 + Math.random() * 20, 
-                    isDestroyed: false,
-                    depth: depth,
+                    isDestroyed: false, depth: depth,
                     color: ['#475569', '#334155', '#1e293b', '#7f1d1d', '#14532d'][Math.floor(Math.random() * 5)]
                 });
-
                 if (Math.random() < 0.7) {
-                    trees.push({
-                        x: currentX + (Math.random() * 40 - 20),
-                        h: 25 + Math.random() * 25,
-                        sway: 0,
-                        isSnapped: false,
-                        depth: depth
-                    });
+                    trees.push({ x: currentX + (Math.random() * 40 - 20), h: 25 + Math.random() * 25, sway: 0, isSnapped: false, depth: depth });
                 }
             }
         }
@@ -358,18 +352,15 @@
             tornado.speed = mphAleatorio / 10; 
 
             let seed = Math.random(); 
-            if (seed < 0.50) {
-                tornado.maxWindForce = Math.floor(Math.random() * (250 - 90 + 1)) + 90;
-            } else if (seed < 0.85) {
-                tornado.maxWindForce = Math.floor(Math.random() * (550 - 251 + 1)) + 251;
-            } else if (seed < 0.97) {
-                tornado.maxWindForce = Math.floor(Math.random() * (800 - 551 + 1)) + 551;
-            } else {
+            if (seed < 0.50) tornado.maxWindForce = Math.floor(Math.random() * (250 - 90 + 1)) + 90;
+            else if (seed < 0.85) tornado.maxWindForce = Math.floor(Math.random() * (550 - 251 + 1)) + 251;
+            else if (seed < 0.97) tornado.maxWindForce = Math.floor(Math.random() * (800 - 551 + 1)) + 551;
+            else {
                 tornado.maxWindForce = Math.floor(Math.random() * (1000 - 801 + 1)) + 801;
                 textAlerts.push({ x: canvas.width / 2, y: canvas.height / 2 - 100, text: "🚨 ALERTA MÁXIMO: TEMPESTADE HISTÓRICA DETECTADA! 🚨", alpha: 2.5 });
             }
 
-            carHull = 100; // Resetando a vida explicitamente aqui
+            carHull = 100;
 
             if(selectedVehicle === 'tiv') { car.width = 95; car.height = 30; car.maxSpeed = 3.2; car.accel = 0.05; car.weight = 8.5; probeCount = 5; } 
             else if(selectedVehicle === 'dom') { car.width = 90; car.height = 28; car.maxSpeed = 8.5; car.accel = 0.22; car.weight = 6.0; probeCount = 5; } 
@@ -381,8 +372,7 @@
             document.getElementById('txtProbes').innerText = probeCount;
 
             inGame = true; gameOver = false; gameWon = false; currentSessionMoney = 0; currentWindMph = 0;
-            car.x = 850; car.vx = 0; car.vy = 0; car.angle = 0; car.rotSpeed = 0;
-            car.y = groundY() - car.height;
+            car.x = 850; car.vx = 0; car.vy = 0; car.angle = 0; car.rotSpeed = 0; car.y = groundY() - car.height;
             tornado.x = -2200; tornado.opacity = 1; probes = []; debris = []; textAlerts = [];
             spikeProgress = 0; suspensionDrop = 0; radarHeight = 0; gameTimeLeft = 90;
 
@@ -400,18 +390,29 @@
             }, 1000);
         }
 
+        // SISTEMA DE DEPLOY TOTALMENTE CORRIGIDO
         function deployProbe() {
-            if(probeCount > 0 && !gameOver && !gameWon && inGame) {
+            if(!inGame || gameOver || gameWon) return;
+            
+            if(probeCount > 0) {
                 probeCount--; 
                 document.getElementById('txtProbes').innerText = probeCount;
 
                 let safetyFactor = Math.max(0, 1 - (currentWindMph / 1200));
-                let successChance = selectedVehicle === 'titanz' ? 0.99 : 0.05 + (safetyFactor * 0.95); 
+                let successChance = selectedVehicle === 'titanz' ? 1.0 : 0.1 + (safetyFactor * 0.9); 
 
                 if (Math.random() <= successChance) {
-                    probes.push({ x: car.x + car.width / 2, y: groundY() - 3, radius: 6, inTornado: false, pulseAnim: 0 });
+                    // Lança a sonda diretamente fixada no solo abaixo do carro
+                    probes.push({ 
+                        x: car.x + car.width / 2, 
+                        y: groundY() - 4, 
+                        radius: 6, 
+                        inTornado: false, 
+                        pulseAnim: 0 
+                    });
+                    textAlerts.push({ x: car.x + car.width / 2, y: car.y - 15, text: "📡 SONDA DISPARADA", alpha: 1.2 });
                 } else {
-                    textAlerts.push({ x: car.x + car.width / 2, y: car.y - 15, text: "❌ PROBE LOST (WIND TOO HIGH)", alpha: 1.0 });
+                    textAlerts.push({ x: car.x + car.width / 2, y: car.y - 15, text: "❌ PROBE DESTROYED BY GALE", alpha: 1.2 });
                 }
             }
         }
@@ -423,12 +424,10 @@
                 rainParticles.forEach(r => { r.y += r.s; r.x -= 4; if(r.y > canvas.height) { r.y = 0; r.x = Math.random()*canvas.width; } });
                 return;
             }
-
             if (gameWon) {
                 tornado.x += 0.5; tornado.opacity -= 0.01; if(tornado.opacity < 0) tornado.opacity = 0;
                 car.vx = 2; car.x += car.vx; car.angle = 0; return;
             }
-
             if (gameOver) return;
 
             if (isNight && Math.random() < 0.01) lightningAlpha = 0.6 + Math.random() * 0.4;
@@ -481,11 +480,9 @@
             trees.forEach(t => {
                 let dist = t.x - tornado.x;
                 if (!t.isSnapped && Math.abs(dist) < tornado.pullRadius) {
-                    let force = (1 - (Math.abs(dist) / tornado.pullRadius));
-                    t.sway = (dist > 0 ? -1 : 1) * force * 0.9;
+                    let force = (1 - (Math.abs(dist) / tornado.pullRadius)); t.sway = (dist > 0 ? -1 : 1) * force * 0.9;
                     if (Math.abs(dist) < tornado.widthBase / 1.2 && Math.random() < 0.05) {
-                        t.isSnapped = true;
-                        debris.push({ x: t.x, y: groundY() - t.h, size: 5, vx: (Math.random() * 5) + 3, vy: -5 });
+                        t.isSnapped = true; debris.push({ x: t.x, y: groundY() - t.h, size: 5, vx: (Math.random() * 5) + 3, vy: -5 });
                     }
                 }
             });
@@ -493,9 +490,7 @@
             showWindWarning = false; 
 
             if (distanceToTornado < tornado.pullRadius && distanceToTornado > -300) {
-                let forceFactor = (1 - (distanceToTornado / tornado.pullRadius));
-                if(forceFactor < 0) forceFactor = 0;
-                
+                let forceFactor = (1 - (distanceToTornado / tornado.pullRadius)); if(forceFactor < 0) forceFactor = 0;
                 currentWindMph = Math.floor(25 + (forceFactor * (tornado.maxWindForce - 25))); 
                 document.getElementById('txtWind').innerText = currentWindMph;
                 document.getElementById('windColor').className = currentWindMph > (tornado.maxWindForce * 0.7) ? "alert" : "";
@@ -509,15 +504,13 @@
                 if(selectedVehicle === 'scout' && currentWindMph > 90) carHull -= 0.18 * damageMultiplier; 
                 
                 if(selectedVehicle === 'dow') {
-                    let maxAllowedWind = (radarHeight >= 14) ? 110 : 100;
-                    if(currentWindMph > maxAllowedWind) carHull -= 0.6 * damageMultiplier;
+                    let maxAllowedWind = (radarHeight >= 14) ? 110 : 100; if(currentWindMph > maxAllowedWind) carHull -= 0.6 * damageMultiplier;
                     currentSessionMoney += 1; document.getElementById('txtMoney').innerText = currentSessionMoney;
                 }
                 if(selectedVehicle === 'titanz') {
                     currentSessionMoney += 4; document.getElementById('txtMoney').innerText = currentSessionMoney;
                     if(!car.isAnchored && currentWindMph > 350) carHull -= 0.02 * damageMultiplier; 
                 }
-
                 if(selectedVehicle === 'titan' && car.isAnchored && spikeProgress >= 100) {
                     if(currentWindMph > 260) carHull -= 0.10 * damageMultiplier;
                 } else if(selectedVehicle === 'titan' && currentWindMph > 140) { carHull -= 0.15 * damageMultiplier; }
@@ -539,26 +532,20 @@
                     else if (selectedVehicle === 'titanz') dmg = 0.001; 
                     
                     carHull -= 0.4 * dmg * damageMultiplier;
-                    
                     if(!car.isAnchored || spikeProgress < 100) {
-                        car.vy -= (3.8 * damageMultiplier) / car.weight;
-                        car.x += (Math.random() - 0.5) * 18;
+                        car.vy -= (3.8 * damageMultiplier) / car.weight; car.x += (Math.random() - 0.5) * 18;
                         if(car.rotSpeed === 0) car.rotSpeed = (Math.random() - 0.5) * 0.22; 
                     }
-                } else {
-                    if(!onGround) car.vy += 0.5;
-                }
+                } else { if(!onGround) car.vy += 0.5; }
             } else {
                 currentWindMph = 22; document.getElementById('txtWind').innerText = "22"; document.getElementById('windColor').className = "";
                 if(!onGround) car.vy += 0.5;
             }
 
-            car.y += car.vy;
-            car.angle += car.rotSpeed;
+            car.y += car.vy; car.angle += car.rotSpeed;
 
             if(car.y >= groundY() - car.height + suspensionDrop) {
-                car.y = groundY() - car.height + suspensionDrop;
-                car.vy = 0;
+                car.y = groundY() - car.height + suspensionDrop; car.vy = 0;
                 if(car.angle !== 0) {
                     if(Math.abs(car.angle) > 0.5) carHull -= selectedVehicle === 'titanz' ? 1 : 12; 
                     car.angle = 0; car.rotSpeed = 0;
@@ -581,23 +568,26 @@
                 d.vy += 0.24; d.x += d.vx; d.y += d.vy;
                 if(d.x > car.x && d.x < car.x + car.width && d.y > car.y && d.y < car.y + car.height) {
                     if((selectedVehicle === 'titan' || selectedVehicle === 'titanz') && car.isAnchored && spikeProgress >= 100) {
-                        currentSessionMoney += selectedVehicle === 'titanz' ? 60 : 25; 
-                        document.getElementById('txtMoney').innerText = currentSessionMoney;
-                    } else {
-                        carHull -= (selectedVehicle === 'scout' || selectedVehicle === 'dow') ? 7 : 1.0;
-                    }
+                        currentSessionMoney += selectedVehicle === 'titanz' ? 60 : 25; document.getElementById('txtMoney').innerText = currentSessionMoney;
+                    } else { carHull -= (selectedVehicle === 'scout' || selectedVehicle === 'dow') ? 7 : 1.0; }
                     debris.splice(idx, 1);
                 }
                 if(d.y > canvas.height || d.x > canvas.width) debris.splice(idx, 1);
             });
 
+            // LOGICA DA SONDA REPARADA (COLISÃO PRECISA COM O TORNADO)
             probes.forEach((p) => {
                 p.pulseAnim += 0.1;
-                let pDistToTornado = p.x - tornado.x;
-                if(Math.abs(pDistToTornado) < tornado.widthBase * 1.5) {
-                    p.inTornado = true; currentSessionMoney += selectedVehicle === 'titanz' ? 30 : 15; 
+                let pDistToTornado = Math.abs(p.x - tornado.x);
+                
+                // Se a sonda estiver dentro do raio de ação do tornado, puxa bônus de dinheiro contínuo
+                if(pDistToTornado < tornado.widthBase * 1.8) {
+                    p.inTornado = true; 
+                    currentSessionMoney += selectedVehicle === 'titanz' ? 25 : 12; 
                     document.getElementById('txtMoney').innerText = currentSessionMoney;
-                } else { p.inTornado = false; }
+                } else { 
+                    p.inTornado = false; 
+                }
             });
 
             textAlerts.forEach((a, idx) => {
@@ -625,33 +615,24 @@
             rainParticles.forEach(r => { ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - 15, r.y + r.s); ctx.stroke(); });
 
             houses.forEach(h => {
-                ctx.fillStyle = h.color;
-                let baseline = h.depth === 'fundo' ? groundY() - 8 : groundY();
+                ctx.fillStyle = h.color; let baseline = h.depth === 'fundo' ? groundY() - 8 : groundY();
                 if (!h.isDestroyed) {
                     ctx.fillRect(h.x, baseline - h.h, h.w, h.h); ctx.fillStyle = '#450a0a';
                     ctx.beginPath(); ctx.moveTo(h.x - 3, baseline - h.h); ctx.lineTo(h.x + h.w / 2, baseline - h.h - 12); ctx.lineTo(h.x + h.w + 3, baseline - h.h); ctx.closePath(); ctx.fill();
-                } else { 
-                    ctx.fillStyle = '#292524'; ctx.fillRect(h.x, baseline - 6, h.w, 6); 
-                }
+                } else { ctx.fillStyle = '#292524'; ctx.fillRect(h.x, baseline - 6, h.w, 6); }
             });
 
             trees.forEach(t => {
-                let baseline = t.depth === 'fundo' ? groundY() - 8 : groundY();
-                ctx.save();
-                ctx.translate(t.x, baseline);
-                ctx.rotate(t.sway);
+                let baseline = t.depth === 'fundo' ? groundY() - 8 : groundY(); ctx.save(); ctx.translate(t.x, baseline); ctx.rotate(t.sway);
                 if(!t.isSnapped) {
-                    ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -t.h, 6, t.h);
-                    ctx.fillStyle = t.depth === 'fundo' ? '#14321a' : '#1e4620';
+                    ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -t.h, 6, t.h); ctx.fillStyle = t.depth === 'fundo' ? '#14321a' : '#1e4620';
                     ctx.beginPath(); ctx.arc(0, -t.h, t.h * 0.4, 0, Math.PI * 2); ctx.fill();
-                } else {
-                    ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -8, 6, 8);
-                }
+                } else { ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -8, 6, 8); }
                 ctx.restore();
             });
 
             probes.forEach(p => {
-                ctx.strokeStyle = p.inTornado ? 'rgba(234, 88, 12, 0.4)' : 'rgba(100, 116, 139, 0.3)'; ctx.lineWidth = 2;
+                ctx.strokeStyle = p.inTornado ? 'rgba(234, 88, 12, 0.5)' : 'rgba(100, 116, 139, 0.4)'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + (Math.sin(p.pulseAnim) * 8 + 8), 0, Math.PI * 2); ctx.stroke();
                 ctx.fillStyle = p.inTornado ? '#ea580c' : '#475569'; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = p.inTornado ? '#ef4444' : '#10b981'; ctx.beginPath(); ctx.arc(p.x, p.y - 2, 2, 0, Math.PI * 2); ctx.fill();
@@ -691,9 +672,7 @@
             });
 
             ctx.save();
-            ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
-            ctx.rotate(car.angle);
-            ctx.translate(-(car.width / 2), -(car.height / 2));
+            ctx.translate(car.x + car.width / 2, car.y + car.height / 2); ctx.rotate(car.angle); ctx.translate(-(car.width / 2), -(car.height / 2));
 
             if (spikeProgress > 0) {
                 let ext = (spikeProgress / 100);
@@ -757,8 +736,7 @@
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#10b981'; ctx.font = 'bold 26px Segoe UI'; ctx.textAlign = 'center';
                 ctx.fillText('PARABÉNS! MISSÃO CUMPRIDA!', canvas.width/2, canvas.height/2 - 30);
-                ctx.fillStyle = '#fff'; ctx.font = '15px Segoe UI';
-                ctx.fillText(`O tornado dissipou. Dados salvos com sucesso!`, canvas.width/2, canvas.height/2 + 5);
+                ctx.fillStyle = '#fff'; ctx.font = '15px Segoe UI'; ctx.fillText(`O tornado dissipou. Dados salvos com sucesso!`, canvas.width/2, canvas.height/2 + 5);
                 ctx.fillStyle = '#f59e0b'; ctx.fillText(`FINANCIAMENTO ADQUIRIDO: +$${currentSessionMoney}`, canvas.width/2, canvas.height/2 + 35);
                 ctx.fillStyle = '#64748b'; ctx.font = '12px monospace'; ctx.fillText('Clique na tela para retornar ao QG', canvas.width/2, canvas.height/2 + 85);
             }
@@ -772,17 +750,14 @@
             }
         }
 
+        // RETORNO AO MENU ISOLADO DE CLIQUES DE INTERFACE
         function returnToMenu(e) {
-            // Corrige o travamento impedindo cliques acidentais nos botões móveis de travar a reinicialização
-            if (e && e.target && e.target.classList.contains('btn')) return;
+            if (e && e.target && (e.target.classList.contains('btn') || e.target.closest('#hud'))) return;
 
             if(gameOver || gameWon) {
                 clearInterval(timerInterval);
-                inGame = false; 
-                gameOver = false; 
-                gameWon = false;
+                inGame = false; gameOver = false; gameWon = false;
                 
-                // Força esconder a interface de jogo e voltar perfeitamente pro menu inicial
                 document.getElementById('hud').style.display = 'none'; 
                 document.getElementById('controls').style.display = 'none';
                 document.getElementById('startScreen').style.display = 'flex'; 
@@ -791,17 +766,16 @@
             }
         }
         
-        // Unificação dos escutadores de fim de jogo com prevenção de conflitos
         window.addEventListener('click', returnToMenu);
         window.addEventListener('touchstart', function(e) {
             if(gameOver || gameWon) {
-                e.preventDefault();
                 returnToMenu(e);
             }
-        }, { passive: false });
+        }, { passive: true });
 
         function engineLoop() { update(); draw(); requestAnimationFrame(engineLoop); }
         engineLoop();
     </script>
 </body>
 </html>
+
