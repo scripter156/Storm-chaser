@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
         body { margin: 0; padding: 0; background-color: #0b0c10; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; }
-        #gameContainer { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         canvas { display: block; }
         
         /* Telas (Menus) */
@@ -33,21 +33,25 @@
         .item-info { text-align: left; max-width: 70%; }
         .item-title { font-weight: bold; font-size: 14px; color: #f1f5f9; }
         .item-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; line-height: 1.3; }
-        .buy-btn { background: #0f172a; border: 1px solid #e2e8f0; color: #e2e8f0; padding: 8px 14px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .buy-btn { background: #0f172a; border: 1px solid #e2e2f0; color: #e2e8f0; padding: 8px 14px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; white-space: nowrap; }
         .buy-btn:disabled { border-color: #334155; color: #475569; }
         
         .code-container { margin-top: 5px; display: flex; gap: 8px; }
         .code-input { background: #090d16; border: 1px solid #334155; color: #f59e0b; padding: 10px; font-family: monospace; width: 130px; text-align: center; border-radius: 4px; font-size: 14px; }
         
-        /* HUD */
-        #hud {
+        /* Container do HUD superior */
+        #hudWrapper {
             position: absolute; top: 15px; left: 15px; right: 15px;
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none; z-index: 5;
+        }
+
+        /* HUD Principal */
+        #hud {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;
             background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%); 
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            padding: 14px; border-radius: 12px; color: #e2e8f0; font-size: 12px; font-family: 'Courier New', monospace;
-            pointer-events: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); display: none;
-            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.3); padding: 12px; border-radius: 12px; color: #e2e8f0; 
+            font-size: 12px; font-family: 'Courier New', monospace; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); 
+            backdrop-filter: blur(8px); display: none;
         }
         .stat { display: flex; flex-direction: column; justify-content: center; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px; border-left: 3px solid #64748b; }
         .stat-title { font-size: 10px; color: #94a3b8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
@@ -60,32 +64,85 @@
         #stat-timer { border-left-color: #ef4444; }
         #stat-hull { border-left-color: #10b981; }
         #stat-wind { border-left-color: #38bdf8; }
+        #stat-scale { border-left-color: #e11d48; text-align: center; }
         
         .alert { color: #ef4444 !important; animation: blink 0.8s infinite; text-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-        /* Controles Móveis - Sonda */
-        .touch-zone { position: absolute; bottom: 30px; display: flex; width: 100%; padding: 0 40px; justify-content: flex-end; pointer-events: none; display: none; }
-        .btn-group-vertical { display: flex; flex-direction: column; gap: 15px; pointer-events: auto; align-items: center; }
-        .btn {
-            width: 80px; height: 80px; background: rgba(30, 41, 59, 0.7);
-            border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 50%;
-            color: white; font-size: 28px; display: flex; align-items: center; justify-content: center;
-            backdrop-filter: blur(6px); box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            transition: background 0.1s;
+        /* Botão de Deploy Manual */
+        #btnManualDeploy {
+            align-self: flex-end; background: #f59e0b; border: 1px solid #ffffff;
+            color: #000000; padding: 6px 15px; font-size: 12px; font-weight: bold;
+            font-family: monospace; cursor: pointer; border-radius: 6px; pointer-events: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: all 0.2s; display: none;
         }
-        .btn:active { background: rgba(255, 255, 255, 0.3); border-color: #fff; }
+        #btnManualDeploy:active { transform: scale(0.95); background: #d97706; }
+
+        /* Controles de Direção Fixos */
+        .control-panel {
+            position: absolute; bottom: 30px; left: 30px; display: none; gap: 15px; z-index: 5; pointer-events: auto;
+        }
+        .action-panel {
+            position: absolute; bottom: 30px; right: 30px; display: none; gap: 15px; z-index: 5; pointer-events: auto;
+        }
+        .btn-game {
+            width: 75px; height: 75px; background: rgba(30, 41, 59, 0.85);
+            border: 2.5px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            color: white; font-size: 24px; display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(8px); box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+            cursor: pointer; transition: background 0.1s;
+        }
+        .btn-game:active { background: rgba(255, 255, 255, 0.4); border-color: #fff; }
+        #btnProbeGame { background: rgba(245, 158, 11, 0.3); border-color: rgba(245, 158, 11, 0.6); }
         
-        #btnProbe { background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.5); width: 88px; height: 88px; font-size: 36px; box-shadow: 0 0 15px rgba(245, 158, 11, 0.1); }
+        /* Botão Sair do Modo Livre */
+        #btnExitFree { position: absolute; top: 170px; right: 15px; background: rgba(239, 68, 68, 0.8); border: 2px solid #ef4444; border-radius: 6px; color: white; padding: 8px 16px; font-weight: bold; cursor: pointer; display: none; z-index: 6; font-size: 14px; }
+        #btnExitFree:active { transform: scale(0.95); background: #ef4444; }
     </style>
 </head>
 <body>
 
     <div id="gameContainer">
+        <div id="hudWrapper">
+            <div id="hud">
+                <div class="stat" id="stat-money">
+                    <div class="stat-title">Orçamento</div>
+                    <span>$<b><span id="txtMoney">0</span></b></span>
+                </div>
+                <div class="stat" id="stat-timer">
+                    <div class="stat-title" id="lblTimer">Tempo Tornado</div>
+                    <span><b><span id="txtTornadoTime">50s</span></b></span>
+                </div>
+                <div class="stat" id="stat-hull">
+                    <div class="stat-title">Blindagem</div>
+                    <span><b><span id="txtHull">100</span>%</b></span>
+                    <div class="bar-container"><div class="bar-fill" id="hullBar"></div></div>
+                </div>
+                <div class="stat" id="stat-wind">
+                    <div class="stat-title">Velocidade Vento</div>
+                    <span id="windColor"><b><span id="txtWind">0</span> MPH</b></span>
+                </div>
+                <div class="stat" id="stat-scale">
+                    <div class="stat-title">Classificação</div>
+                    <span>⚠️ <b style="font-size:16px; color:#f43f5e;"><span id="txtEFScale">EF0</span></b></span>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">Sondas Disp.</div>
+                    <span>📦 <b><span id="txtProbes">10</span></b></span>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">Sistema</div>
+                    <span id="anchorStatus" style="font-weight: bold; color: #cbd5e1;">DISPONÍVEL</span>
+                </div>
+            </div>
+            <button id="btnManualDeploy" onclick="manualDeploy(event)">MANUAL DEPLOY</button>
+        </div>
+
         <div id="startScreen" class="menu-screen">
             <h1>STORM CHASERS</h1>
-            <div class="subtitle">REALISTIC METEOROLOGICAL INTERCEPT NETWORK v7.6</div>
-            <button class="menu-btn" onclick="startGame()">INICIAR INTERCEPTAÇÃO</button>
+            <div class="subtitle">REALISTIC METEOROLOGICAL INTERCEPT NETWORK v10.1 🎉</div>
+            <button class="menu-btn" onclick="startGame(false)">INICIAR INTERCEPTAÇÃO</button>
+            <button class="menu-btn" style="border-color: #38bdf8; color: #38bdf8;" onclick="startGame(true)">MODO LIVRE INFINITO</button>
             <button class="menu-btn" onclick="openShop()">GARAGEM DA EQUIPE</button>
             <div style="margin-top: 15px; font-size: 12px; color: #94a3b8;">ORÇAMENTO: $<span class="current-money">0</span></div>
         </div>
@@ -139,6 +196,14 @@
                     </div>
                     <button class="buy-btn" id="btnBuyTITANZ" style="border-color: #d946ef; color:#f472b6;" onclick="buyVehicle('titanz', 1000000)">$1.000.000</button>
                 </div>
+
+                <div class="shop-item" id="item-nexus" style="display: none; border-color: #06b6d4; background: #071e22;">
+                    <div class="item-info">
+                        <div class="item-title" style="color:#22d3ee; font-weight: 900; text-shadow: 0 0 12px rgba(34,211,238,0.6);">🌌 NEXUS-Ω Hyper-Interceptor</div>
+                        <div class="item-desc" style="color:#99f6e4;">8 RODAS & 7 ESPETOS. Aerodinâmica perfeita, 1998 Sondas e resiste a 999 Bilhões MPH!</div>
+                    </div>
+                    <button class="buy-btn" id="btnBuyNEXUS" style="border-color: #06b6d4; color:#22d3ee;" onclick="buyVehicle('nexus', 1000000000)">$1.000.0000.000</button>
+                </div>
             </div>
 
             <div class="code-container">
@@ -149,40 +214,17 @@
             <button class="menu-btn" style="width:150px; margin-top:10px; border-color:#64748b; color:#64748b;" onclick="closeShop()">VOLTAR</button>
         </div>
 
-        <div id="hud">
-            <div class="stat" id="stat-money">
-                <div class="stat-title">Orçamento</div>
-                <span>$<b><span id="txtMoney">0</span></b></span>
-            </div>
-            <div class="stat" id="stat-timer">
-                <div class="stat-title">Tempo Tornado</div>
-                <span><b><span id="txtTornadoTime">90s</span></b></span>
-            </div>
-            <div class="stat" id="stat-hull">
-                <div class="stat-title">Blindagem</div>
-                <span><b><span id="txtHull">100</span>%</b></span>
-                <div class="bar-container"><div class="bar-fill" id="hullBar"></div></div>
-            </div>
-            <div class="stat" id="stat-wind">
-                <div class="stat-title">Velocidade Vento</div>
-                <span id="windColor"><b><span id="txtWind">0</span> MPH</b></span>
-            </div>
-            <div class="stat">
-                <div class="stat-title">Sondas Disp.</div>
-                <span>📦 <b><span id="txtProbes">5</span></b></span>
-            </div>
-            <div class="stat">
-                <div class="stat-title">Sistema</div>
-                <span id="anchorStatus" style="font-weight: bold; color: #cbd5e1;">DISPONÍVEL</span>
-            </div>
-        </div>
+        <button id="btnExitFree" onclick="exitFreeMode()">SAIR</button>
 
         <canvas id="ctxCanvas"></canvas>
 
-        <div class="touch-zone" id="controls">
-            <div class="btn-group-vertical">
-                <div class="btn" id="btnProbe">📡</div>
-            </div>
+        <div class="control-panel" id="uiControls">
+            <div class="btn-game" id="padLeft">◀</div>
+            <div class="btn-game" id="padRight">▶</div>
+        </div>
+
+        <div class="action-panel" id="uiActions">
+            <div class="btn-game" id="btnProbeGame">📡</div>
         </div>
     </div>
 
@@ -195,45 +237,83 @@
         resize();
 
         let globalMoney = 0;
-        let hasTIV = false; let hasDOM = false; let hasDOW = false; let hasTITAN = false; let hasTITANZ = false;
+        let hasTIV = false; let hasDOM = false; let hasDOW = false; let hasTITAN = false; let hasTITANZ = false; let hasNEXUS = false;
         let selectedVehicle = 'scout';
         let cheatActive = false;
         let code2030Unlocked = false;
+        let code2040Unlocked = false;
+        let usedCodes = {};
 
         let inGame = false;
+        let isFreeMode = false;
         let currentSessionMoney = 0;
-        let probeCount = 5;
+        let probeCount = 10;
         let carHull = 100;
         let gameOver = false; let gameWon = false;
-        let gameTimeLeft = 90; 
+        let gameTimeLeft = 50; 
+        let freeModeTimer = 60; 
         let timerInterval = null;
-        let isNight = false;
         let lightningAlpha = 0;
         
+        let timeOfDayValue = 0.25; 
+        let cameraX = 0; 
         let spikeProgress = 0; let suspensionDrop = 0; let radarHeight = 0; 
+        let insideTornadoFactor = 0; 
         const groundY = () => canvas.height - 100;
 
         let car = { x: 500, y: 0, width: 85, height: 28, vx: 0, vy: 0, maxSpeed: 6, accel: 0.16, friction: 0.05, weight: 2.5, isAnchored: false, angle: 0, rotSpeed: 0 };
         let currentWindMph = 0;
         
-        let tornado = { x: -2000, widthBase: 420, widthTop: 1100, speed: 1.5, pullRadius: 1300, opacity: 1, maxWindForce: 300 };
+        let tornado = { x: -600, widthBase: 420, widthTop: 1100, speed: 1.5, pullRadius: 1300, opacity: 1, maxWindForce: 300, isSupercell: false };
 
         let probes = [];
         let particles = [];
         let rainParticles = [];
         let debris = [];
-        let houses = [];
-        let trees = []; 
         let textAlerts = []; 
+
+        let keys = { ArrowLeft: false, ArrowRight: false };
 
         for(let i=0; i<60; i++) rainParticles.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: 7 + Math.random()*7 });
 
         window.addEventListener('keydown', e => {
             if(!inGame || gameOver || gameWon) return;
             if(e.key === ' ') deployProbe();
+            if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { keys.ArrowLeft = true; retractSpikes(); }
+            if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { keys.ArrowRight = true; retractSpikes(); }
         });
 
-        document.getElementById('btnProbe').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); deployProbe(); }, { passive: false });
+        window.addEventListener('keyup', e => {
+            if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.ArrowLeft = false;
+            if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.ArrowRight = false;
+        });
+
+        setupPanelButton('padLeft', 'ArrowLeft');
+        setupPanelButton('padRight', 'ArrowRight');
+
+        function setupPanelButton(id, keyName) {
+            const el = document.getElementById(id);
+            el.addEventListener('mousedown', () => { keys[keyName] = true; retractSpikes(); });
+            el.addEventListener('mouseup', () => { keys[keyName] = false; });
+            el.addEventListener('mouseleave', () => { keys[keyName] = false; });
+            
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; retractSpikes(); }, { passive: false });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; }, { passive: false });
+        }
+
+        // Função interna para o carro recolher os espinhos e suspensão imediatamente ao acelerar/andar
+        function retractSpikes() {
+            if (car.isAnchored) {
+                car.isAnchored = false;
+                spikeProgress = 0;
+                suspensionDrop = 0;
+                radarHeight = 0;
+                document.getElementById('anchorStatus').innerText = "DISPONÍVEL";
+            }
+        }
+
+        document.getElementById('btnProbeGame').addEventListener('click', deployProbe);
+        document.getElementById('btnProbeGame').addEventListener('touchstart', (e) => { e.preventDefault(); deployProbe(); }, { passive: false });
 
         function updateMoneyUI() {
             document.querySelectorAll('.current-money').forEach(el => el.innerText = cheatActive ? "INF" : globalMoney);
@@ -242,21 +322,52 @@
         function openShop() { document.getElementById('startScreen').style.display = 'none'; document.getElementById('shopScreen').style.display = 'flex'; updateMoneyUI(); }
         function closeShop() { document.getElementById('shopScreen').style.display = 'none'; document.getElementById('startScreen').style.display = 'flex'; }
         
+        function manualDeploy(e) {
+            if (e) e.stopPropagation();
+            spikeProgress = 100;
+            if (car) {
+                car.vx = 0;
+                car.isAnchored = true;
+            }
+            textAlerts.push({ 
+                x: car.x, 
+                y: car.y - 40, 
+                text: "🚀 DEPLOY FORÇADO CRÍTICO (100%)!", 
+                alpha: 3.0, 
+                isGlobal: true 
+            });
+        }
+
         function checkCode() {
-            let code = document.getElementById('codeInput').value;
+            let code = document.getElementById('codeInput').value.trim();
+            if (usedCodes[code]) { alert('ESTE CÓDIGO JÁ FOI RESGATADO!'); return; }
+
             if(code === '2020') {
-                cheatActive = true; globalMoney = Infinity; updateMoneyUI();
+                usedCodes[code] = true; cheatActive = true; globalMoney = Infinity; updateMoneyUI();
                 alert('CHASSIS INTELLIGENCE ENGAGED!');
                 document.getElementById('btnBuyTIV').innerText = "SELECIONAR";
                 document.getElementById('btnBuyDOM').innerText = "SELECIONAR";
                 document.getElementById('btnBuyDOW').innerText = "SELECIONAR";
                 document.getElementById('btnBuyTITAN').innerText = "SELECIONAR";
                 if(code2030Unlocked) document.getElementById('btnBuyTITANZ').innerText = "SELECIONAR";
+                if(code2040Unlocked) document.getElementById('btnBuyNEXUS').innerText = "SELECIONAR";
             } else if(code === '2030') {
-                code2030Unlocked = true;
+                usedCodes[code] = true; code2030Unlocked = true;
                 document.getElementById('item-titanz').style.display = 'flex';
                 alert('⚡ PROJETO CRÍTICO 2030 REVELADO NA GARAGEM! ⚡');
+            } else if(code === '2040') {
+                usedCodes[code] = true; code2040Unlocked = true;
+                document.getElementById('item-nexus').style.display = 'flex';
+                alert('🌌 NEXUS-Ω HYPER-VEHICLE DESBLOQUEADO NA LOJA! 🌌');
+            } else if(code === '1234') {
+                usedCodes[code] = true; globalMoney += 50000; updateMoneyUI();
+                alert('💰 FINANCIAMENTO INJETADO: +$50.000!');
+            } else if(code === '10.1') {
+                // NOVO CÓDIGO DA ATUALIZAÇÃO 10.1 🎁🎉
+                usedCodes[code] = true; globalMoney += 100000; updateMoneyUI();
+                alert('🎉 ATUALIZAÇÃO 10.1: VOCÊ RECEBEU +$100.000 DE BÔNUS COLECIONADOR!');
             } else { alert('CÓDIGO INCORRETO'); }
+            document.getElementById('codeInput').value = '';
         }
 
         function buyVehicle(type, price) {
@@ -266,6 +377,7 @@
                 if(type === 'dow') { if(!cheatActive && !hasDOW) globalMoney -= price; hasDOW = true; }
                 if(type === 'titan') { if(!cheatActive && !hasTITAN) globalMoney -= price; hasTITAN = true; }
                 if(type === 'titanz') { if(!cheatActive && !hasTITANZ) globalMoney -= price; hasTITANZ = true; }
+                if(type === 'nexus') { if(!cheatActive && !hasNEXUS) globalMoney -= price; hasNEXUS = true; }
                 selectVehicle(type); updateMoneyUI();
             } else { alert('SALDO INSUFICIENTE!'); }
         }
@@ -276,6 +388,7 @@
             if(type === 'dow' && !hasDOW && !cheatActive) return;
             if(type === 'titan' && !hasTITAN && !cheatActive) return;
             if(type === 'titanz' && !hasTITANZ && !cheatActive) return;
+            if(type === 'nexus' && !hasNEXUS && !cheatActive) return;
             selectedVehicle = type;
             document.getElementById('item-scout').className = type === 'scout' ? 'shop-item owned' : 'shop-item';
             document.getElementById('item-tiv').className = type === 'tiv' ? 'shop-item owned' : 'shop-item';
@@ -283,6 +396,7 @@
             document.getElementById('item-dow').className = type === 'dow' ? 'shop-item owned' : 'shop-item';
             document.getElementById('item-titan').className = type === 'titan' ? 'shop-item owned' : 'shop-item';
             document.getElementById('item-titanz').className = type === 'titanz' ? 'shop-item owned' : 'shop-item';
+            document.getElementById('item-nexus').className = type === 'nexus' ? 'shop-item owned' : 'shop-item';
             
             document.getElementById('btnScoutSelect').innerText = type === 'scout' ? "SELECIONADO" : "SELECIONAR";
             document.getElementById('btnScoutSelect').disabled = type === 'scout';
@@ -291,77 +405,124 @@
             if(hasDOW || cheatActive) document.getElementById('btnBuyDOW').innerText = type === 'dow' ? "SELECIONADO" : "SELECIONAR";
             if(hasTITAN || cheatActive) document.getElementById('btnBuyTITAN').innerText = type === 'titan' ? "SELECIONADO" : "SELECIONAR";
             if(hasTITANZ || cheatActive) document.getElementById('btnBuyTITANZ').innerText = type === 'titanz' ? "SELECIONADO" : "SELECIONAR";
+            if(hasNEXUS || cheatActive) document.getElementById('btnBuyNEXUS').innerText = type === 'nexus' ? "SELECIONADO" : "SELECIONAR";
         }
 
-        function generateScenery() {
-            houses = []; trees = []; let currentX = 50;
-            for(let i = 0; i < 45; i++) {
-                currentX += 60 + Math.random() * 140; 
-                let depth = Math.random() < 0.6 ? 'fundo' : 'perto';
-                houses.push({
-                    x: currentX, 
-                    w: depth === 'fundo' ? 30 + Math.random() * 15 : 45 + Math.random() * 20, 
-                    h: depth === 'fundo' ? 22 + Math.random() * 12 : 35 + Math.random() * 20, 
-                    isDestroyed: false, depth: depth,
-                    color: ['#475569', '#334155', '#1e293b', '#7f1d1d', '#14532d'][Math.floor(Math.random() * 5)]
-                });
-                if (Math.random() < 0.7) {
-                    trees.push({ x: currentX + (Math.random() * 40 - 20), h: 25 + Math.random() * 25, sway: 0, isSnapped: false, depth: depth });
-                }
-            }
+        function updateEFScaleDisplay(wind) {
+            let scale = "EF0";
+            if (wind >= 65 && wind <= 85) scale = "EF0";
+            else if (wind >= 86 && wind <= 110) scale = "EF1";
+            else if (wind >= 111 && wind <= 135) scale = "EF2";
+            else if (wind >= 136 && wind <= 165) scale = "EF3";
+            else if (wind >= 166 && wind <= 200) scale = "EF4";
+            else if (wind > 200) scale = "EF5";
+            document.getElementById('txtEFScale').innerText = scale;
         }
 
-        function startGame() {
+        function spawnNewFreeModeTornado() {
+            tornado.x = car.x - 1300; 
+            tornado.opacity = 1;
+            tornado.isSupercell = true;
+            let randomMph = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
+            tornado.speed = randomMph / 10;
+            tornado.maxWindForce = Math.floor(Math.random() * (750 - 180 + 1)) + 180;
+            
+            textAlerts.push({ x: car.x, y: groundY() - 300, text: "🚨 ALERTA RADAR: NOVA SUPERCÉLULA SE FORMANDO!", alpha: 4.0, isGlobal: true });
+        }
+
+        function startGame(freeModeActivated = false) {
+            isFreeMode = freeModeActivated;
             document.getElementById('startScreen').style.display = 'none';
             document.getElementById('hud').style.display = 'grid';
-            document.getElementById('controls').style.display = 'flex';
+            document.getElementById('btnManualDeploy').style.display = 'block';
+            document.getElementById('uiControls').style.display = 'flex';
+            document.getElementById('uiActions').style.display = 'flex';
             
-            isNight = Math.random() < 0.5; 
-            generateScenery();
+            timeOfDayValue = 0.25; 
 
-            let mphAleatorio = Math.floor(Math.random() * (30 - 10 + 1)) + 10;
-            tornado.speed = mphAleatorio / 10; 
+            // LOGICA REFORMULADA V10.1: Garante 100% de blindagem independente do veículo escolhido anteriormente
+            carHull = 100;
+            document.getElementById('txtHull').innerText = "100";
+            document.getElementById('hullBar').style.width = "100%";
 
-            let seed = Math.random(); 
-            if (seed < 0.50) tornado.maxWindForce = Math.floor(Math.random() * (250 - 90 + 1)) + 90;
-            else if (seed < 0.85) tornado.maxWindForce = Math.floor(Math.random() * (250 - 251 + 1)) + 251;
-            else if (seed < 0.97) tornado.maxWindForce = Math.floor(Math.random() * (800 - 551 + 1)) + 551;
-            else {
-                tornado.maxWindForce = Math.floor(Math.random() * (1000 - 801 + 1)) + 801;
-                textAlerts.push({ x: canvas.width / 2, y: canvas.height / 2 - 100, text: "🚨 ALERTA MÁXIMO: TEMPESTADE HISTÓRICA DETECTADA! 🚨", alpha: 2.5 });
+            if(isFreeMode) {
+                document.getElementById('btnExitFree').style.display = 'block';
+                document.getElementById('lblTimer').innerText = "Supercélula em";
+                freeModeTimer = 60;
+                document.getElementById('txtTornadoTime').innerText = freeModeTimer + "s";
+                document.getElementById('txtTornadoTime').className = "";
+            } else {
+                document.getElementById('btnExitFree').style.display = 'none';
+                document.getElementById('lblTimer').innerText = "Tempo Tornado";
             }
 
-            carHull = 100;
-
-            if(selectedVehicle === 'tiv') { car.width = 95; car.height = 30; car.maxSpeed = 3.2; car.accel = 0.05; car.weight = 8.5; probeCount = 5; } 
-            else if(selectedVehicle === 'dom') { car.width = 90; car.height = 28; car.maxSpeed = 8.5; car.accel = 0.22; car.weight = 6.0; probeCount = 5; } 
-            else if(selectedVehicle === 'dow') { car.width = 100; car.height = 34; car.maxSpeed = 10.0; car.accel = 0.28; car.weight = 4.2; probeCount = 5; } 
-            else if(selectedVehicle === 'titan') { car.width = 110; car.height = 38; car.maxSpeed = 7.5; car.accel = 0.20; car.weight = 12.0; probeCount = 5; } 
-            else if(selectedVehicle === 'titanz') { car.width = 115; car.height = 40; car.maxSpeed = 9.0; car.accel = 0.25; car.weight = 25.0; probeCount = 10; } 
-            else { car.width = 85; car.height = 28; car.maxSpeed = 6.0; car.accel = 0.16; car.weight = 2.5; probeCount = 5; }
+            if(selectedVehicle === 'tiv') { car.width = 95; car.height = 30; car.maxSpeed = 3.2; car.accel = 0.05; car.weight = 8.5; probeCount = 10; } 
+            else if(selectedVehicle === 'dom') { car.width = 90; car.height = 28; car.maxSpeed = 8.5; car.accel = 0.22; car.weight = 6.0; probeCount = 10; } 
+            else if(selectedVehicle === 'dow') { car.width = 100; car.height = 34; car.maxSpeed = 10.0; car.accel = 0.28; car.weight = 4.2; probeCount = 10; } 
+            else if(selectedVehicle === 'titan') { car.width = 110; car.height = 38; car.maxSpeed = 7.5; car.accel = 0.20; car.weight = 12.0; probeCount = 10; } 
+            else if(selectedVehicle === 'titanz') { car.width = 115; car.height = 40; car.maxSpeed = 9.0; car.accel = 0.25; car.weight = 25.0; probeCount = 20; } 
+            else if(selectedVehicle === 'nexus') { car.width = 125; car.height = 24; car.maxSpeed = 15.0; car.accel = 0.40; car.weight = 50.0; probeCount = 1998; } 
+            else { car.width = 85; car.height = 28; car.maxSpeed = 6.0; car.accel = 0.16; car.weight = 2.5; probeCount = 10; }
             
             document.getElementById('txtProbes').innerText = probeCount;
 
-            inGame = true; gameOver = false; gameWon = false; currentSessionMoney = 0; currentWindMph = 0;
-            car.x = 250; car.vx = 0; car.vy = 0; car.angle = 0; car.rotSpeed = 0; car.y = groundY() - car.height;
-            tornado.x = -2200; tornado.opacity = 1; probes = []; debris = []; textAlerts = [];
+            inGame = true; gameOver = false; gameWon = false; currentSessionMoney = 0; currentWindMph = 0; insideTornadoFactor = 0;
+            car.x = 500; car.vx = 0; car.vy = 0; car.angle = 0; car.rotSpeed = 0; car.y = groundY() - car.height;
+            cameraX = car.x - canvas.width / 2;
             
-            // Inicializa variáveis do deploy zeradas para que o progresso automático aconteça visivelmente na tela
+            tornado.x = car.x - 1200; 
+            tornado.isSupercell = isFreeMode; 
+            tornado.opacity = 1; probes = []; debris = []; textAlerts = [];
+            
             spikeProgress = 0; suspensionDrop = 0; radarHeight = 0;
-            gameTimeLeft = 90;
+            car.isAnchored = false;
+            gameTimeLeft = 50; 
 
-            document.getElementById('txtTornadoTime').innerText = gameTimeLeft + "s";
-            document.getElementById('txtTornadoTime').className = "";
+            if(!isFreeMode) {
+                document.getElementById('txtTornadoTime').innerText = gameTimeLeft + "s";
+                document.getElementById('txtTornadoTime').className = "";
+                tornado.maxWindForce = Math.floor(Math.random() * (300 - 110 + 1)) + 110;
+            } else {
+                tornado.maxWindForce = Math.floor(Math.random() * (600 - 200 + 1)) + 200;
+            }
+            
             document.getElementById('txtMoney').innerText = "0";
+            updateEFScaleDisplay(0);
 
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 if(inGame && !gameOver && !gameWon) {
-                    gameTimeLeft--; document.getElementById('txtTornadoTime').innerText = gameTimeLeft + "s";
-                    if(gameTimeLeft <= 15) document.getElementById('txtTornadoTime').className = "alert";
-                    if(gameTimeLeft <= 0) { gameWon = true; clearInterval(timerInterval); if(!cheatActive) globalMoney += currentSessionMoney; }
+                    if(!isFreeMode) {
+                        gameTimeLeft--; document.getElementById('txtTornadoTime').innerText = gameTimeLeft + "s";
+                        if(gameTimeLeft <= 15) document.getElementById('txtTornadoTime').className = "alert";
+                        if(gameTimeLeft <= 0) { gameWon = true; clearInterval(timerInterval); if(!cheatActive) globalMoney += currentSessionMoney; }
+                    } else {
+                        freeModeTimer--;
+                        document.getElementById('txtTornadoTime').innerText = freeModeTimer + "s";
+                        if(freeModeTimer <= 10) document.getElementById('txtTornadoTime').className = "alert";
+                        else document.getElementById('txtTornadoTime').className = "";
+                        
+                        if(freeModeTimer <= 0) {
+                            freeModeTimer = 60;
+                            spawnNewFreeModeTornado();
+                        }
+                    }
                 }
             }, 1000);
+        }
+
+        function exitFreeMode() {
+            if(!inGame || !isFreeMode) return;
+            clearInterval(timerInterval);
+            inGame = false;
+            if(!cheatActive) globalMoney += currentSessionMoney;
+            document.getElementById('hud').style.display = 'none'; 
+            document.getElementById('btnManualDeploy').style.display = 'none';
+            document.getElementById('uiControls').style.display = 'none';
+            document.getElementById('uiActions').style.display = 'none';
+            document.getElementById('btnExitFree').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'flex'; 
+            updateMoneyUI();
         }
 
         function deployProbe() {
@@ -370,7 +531,7 @@
                 probeCount--; 
                 document.getElementById('txtProbes').innerText = probeCount;
                 probes.push({ x: car.x + car.width / 2, y: groundY() - 4, radius: 6, inTornado: false, pulseAnim: 0 });
-                textAlerts.push({ x: car.x + car.width / 2, y: car.y - 15, text: "📡 SONDA DISPARADA", alpha: 1.2 });
+                textAlerts.push({ x: car.x + car.width / 2, y: car.y - 15, text: "📡 SONDA DISPARADA", alpha: 1.2, isGlobal: true });
             }
         }
 
@@ -383,65 +544,80 @@
             }
             if (gameWon) {
                 tornado.x += 0.5; tornado.opacity -= 0.01; if(tornado.opacity < 0) tornado.opacity = 0;
-                car.vx = 2; car.x += car.vx; car.angle = 0; return;
+                car.vx = 2; car.x += car.vx; car.angle = 0; 
+                cameraX = car.x - canvas.width / 2;
+                return;
             }
             if (gameOver) return;
 
-            if (isNight && Math.random() < 0.01) lightningAlpha = 0.6 + Math.random() * 0.4;
+            if(isFreeMode) {
+                timeOfDayValue += 0.0002; 
+                if(timeOfDayValue >= 1.0) timeOfDayValue = 0.0;
+            }
+
+            if (Math.random() < 0.008) lightningAlpha = 0.6 + Math.random() * 0.4;
             if (lightningAlpha > 0) lightningAlpha -= 0.04;
 
             let onGround = car.y >= groundY() - car.height + suspensionDrop;
 
-            // BUG FIX: DEPLOY TOTALMENTE AUTOMÁTICO SEM CHECAGEM DE VENTO MÍNIMO
-            if (selectedVehicle !== 'scout' && onGround) {
-                car.isAnchored = true; car.vx = 0;
-                
-                if(selectedVehicle === 'tiv') { if(spikeProgress < 100) spikeProgress += 0.5; } 
-                else if(selectedVehicle === 'dom') { if(spikeProgress < 100) spikeProgress += 2.0; if(suspensionDrop < 6) suspensionDrop += 0.2; } 
-                else if(selectedVehicle === 'dow') { if(radarHeight < 14) radarHeight += 0.4; spikeProgress = 100; } 
-                else if(selectedVehicle === 'titan' || selectedVehicle === 'titanz') { if(spikeProgress < 100) spikeProgress += 3.0; if(selectedVehicle === 'titanz' && radarHeight < 12) radarHeight += 0.5; }
+            if (keys.ArrowLeft) {
+                car.vx -= car.accel;
+                if(car.vx < -car.maxSpeed) car.vx = -car.maxSpeed;
+            } else if (keys.ArrowRight) {
+                car.vx += car.accel;
+                if(car.vx > car.maxSpeed) car.vx = car.maxSpeed;
+            } else {
+                if(car.vx > 0) car.vx = Math.max(0, car.vx - car.friction);
+                if(car.vx < 0) car.vx = Math.min(0, car.vx + car.friction);
+            }
+
+            // Ancoragem por estabilização padrão
+            if (selectedVehicle !== 'scout' && onGround && !keys.ArrowLeft && !keys.ArrowRight && Math.abs(car.vx) < 0.2) {
+                car.isAnchored = true; 
+                car.vx = 0; 
+
+                if(selectedVehicle === 'tiv') { if(spikeProgress < 100) spikeProgress += 0.8; } 
+                else if(selectedVehicle === 'dom') { if(spikeProgress < 100) spikeProgress += 2.5; if(suspensionDrop < 6) suspensionDrop += 0.3; } 
+                else if(selectedVehicle === 'dow') { if(radarHeight < 14) radarHeight += 0.5; spikeProgress = 100; } 
+                else if(selectedVehicle === 'titan' || selectedVehicle === 'titanz') { if(spikeProgress < 100) spikeProgress += 3.5; if(selectedVehicle === 'titanz' && radarHeight < 12) radarHeight += 0.6; }
+                else if(selectedVehicle === 'nexus') { if(spikeProgress < 100) spikeProgress += 6.0; if(suspensionDrop < 4) suspensionDrop += 0.5; }
 
                 let pct = Math.floor(spikeProgress);
                 if(selectedVehicle === 'dow') document.getElementById('anchorStatus').innerText = "RADAR: OK";
                 else if(selectedVehicle === 'titanz') document.getElementById('anchorStatus').innerText = pct < 100 ? `DEPLOY: ${pct}%` : "🛸 SEGURO";
-                else if(selectedVehicle === 'titan') document.getElementById('anchorStatus').innerText = pct < 100 ? `DEPLOY: ${pct}%` : "🔒 FIXADO";
+                else if(selectedVehicle === 'nexus') document.getElementById('anchorStatus').innerText = pct < 100 ? `LOCKING: ${pct}%` : "🌌 OMEGA ACTIVE";
                 else document.getElementById('anchorStatus').innerText = pct < 100 ? `DEPLOY: ${pct}%` : "🔒 FIXADO";
             } else {
-                car.isAnchored = false;
-                document.getElementById('anchorStatus').innerText = "DISPONÍVEL";
+                if(!car.isAnchored || spikeProgress < 100) {
+                    car.isAnchored = false; 
+                    spikeProgress = 0; 
+                    suspensionDrop = 0;
+                    document.getElementById('anchorStatus').innerText = "DISPONÍVEL";
+                }
             }
 
             car.x += car.vx;
-            if(car.x < 30) car.x = 30; if(car.x > canvas.width - car.width - 30) car.x = canvas.width - car.width - 30;
+            cameraX = car.x - canvas.width / 2;
 
             tornado.x += tornado.speed;
-            let distanceToTornado = (car.x + car.width/2) - tornado.x;
+            let distanceToTornado = Math.abs((car.x + car.width/2) - tornado.x);
 
-            houses.forEach(h => {
-                let centerHouse = h.x + h.w / 2;
-                if (!h.isDestroyed && Math.abs(centerHouse - tornado.x) < tornado.widthBase / 1.1) {
-                    h.isDestroyed = true;
-                    for(let k = 0; k < 4; k++) debris.push({ x: h.x + Math.random() * h.w, y: groundY() - 20, size: 4 + Math.random() * 6, vx: (Math.random() * 6) + 2, vy: -7 - Math.random() * 8 });
-                }
-            });
-
-            trees.forEach(t => {
-                let dist = t.x - tornado.x;
-                if (!t.isSnapped && Math.abs(dist) < tornado.pullRadius) {
-                    let force = (1 - (Math.abs(dist) / tornado.pullRadius)); t.sway = (dist > 0 ? -1 : 1) * force * 0.9;
-                    if (Math.abs(dist) < tornado.widthBase / 1.2 && Math.random() < 0.05) {
-                        t.isSnapped = true; debris.push({ x: t.x, y: groundY() - t.h, size: 5, vx: (Math.random() * 5) + 3, vy: -5 });
-                    }
-                }
-            });
+            if(isFreeMode && tornado.isSupercell && distanceToTornado < 1200) {
+                tornado.isSupercell = false;
+                textAlerts.push({ x: car.x, y: groundY() - 250, text: "🌪️ SUPERCÉLULA DE TOCO DE SOLO REALIZADA!", alpha: 3.5, isGlobal: true });
+            }
 
             showWindWarning = false; 
 
-            if (distanceToTornado < tornado.pullRadius && distanceToTornado > -300) {
+            if (distanceToTornado < tornado.pullRadius && !tornado.isSupercell) {
                 let forceFactor = (1 - (distanceToTornado / tornado.pullRadius)); if(forceFactor < 0) forceFactor = 0;
                 currentWindMph = Math.floor(25 + (forceFactor * (tornado.maxWindForce - 25))); 
                 document.getElementById('txtWind').innerText = currentWindMph;
                 document.getElementById('windColor').className = currentWindMph > (tornado.maxWindForce * 0.7) ? "alert" : "";
+                updateEFScaleDisplay(currentWindMph);
+
+                let tornadoPowerMultiplier = Math.min(1.5, tornado.maxWindForce / 300);
+                insideTornadoFactor = Math.min(1, forceFactor * 1.3 * tornadoPowerMultiplier);
 
                 if(selectedVehicle === 'scout' && currentWindMph > 80) showWindWarning = true;
                 if(selectedVehicle === 'dow' && currentWindMph > 95) showWindWarning = true;
@@ -459,6 +635,9 @@
                     currentSessionMoney += 4; document.getElementById('txtMoney').innerText = currentSessionMoney;
                     if(!car.isAnchored && currentWindMph > 350) carHull -= 0.02 * damageMultiplier; 
                 }
+                if(selectedVehicle === 'nexus') {
+                    currentSessionMoney += 25; document.getElementById('txtMoney').innerText = currentSessionMoney;
+                }
                 if(selectedVehicle === 'titan' && car.isAnchored && spikeProgress >= 100) {
                     if(currentWindMph > 260) carHull -= 0.10 * damageMultiplier;
                 } else if(selectedVehicle === 'titan' && currentWindMph > 140) { carHull -= 0.15 * damageMultiplier; }
@@ -467,9 +646,11 @@
                 if(selectedVehicle === 'dom') spikeFactor *= 1.4;
                 if(selectedVehicle === 'titan') spikeFactor *= 2.5; 
                 if(selectedVehicle === 'titanz') spikeFactor *= 6.0; 
+                if(selectedVehicle === 'nexus') spikeFactor *= 50.0; 
                 
                 let currentWeight = car.isAnchored ? (car.weight * spikeFactor) : car.weight;
-                car.x -= (forceFactor * 10.5 * damageMultiplier) / currentWeight;
+                let pullDirection = (car.x + car.width/2 > tornado.x) ? -1 : 1;
+                car.x += (pullDirection * forceFactor * 10.5 * damageMultiplier) / currentWeight;
 
                 if (distanceToTornado < tornado.widthBase / 2) {
                     let dmg = 0.18;
@@ -478,6 +659,7 @@
                     else if (selectedVehicle === 'dow') dmg = 3.8;
                     else if (selectedVehicle === 'titan') dmg = 0.04;
                     else if (selectedVehicle === 'titanz') dmg = 0.001; 
+                    else if (selectedVehicle === 'nexus') dmg = 0.0; 
                     
                     carHull -= 0.4 * dmg * damageMultiplier;
                     if(!car.isAnchored || spikeProgress < 100) {
@@ -486,7 +668,11 @@
                     }
                 } else { if(!onGround) car.vy += 0.5; }
             } else {
-                currentWindMph = 22; document.getElementById('txtWind').innerText = "22"; document.getElementById('windColor').className = "";
+                currentWindMph = tornado.isSupercell ? 35 : 22; 
+                document.getElementById('txtWind').innerText = currentWindMph; 
+                document.getElementById('windColor').className = "";
+                updateEFScaleDisplay(currentWindMph);
+                insideTornadoFactor = Math.max(0, insideTornadoFactor - 0.05);
                 if(!onGround) car.vy += 0.5;
             }
 
@@ -495,76 +681,123 @@
             if(car.y >= groundY() - car.height + suspensionDrop) {
                 car.y = groundY() - car.height + suspensionDrop; car.vy = 0;
                 if(car.angle !== 0) {
-                    if(Math.abs(car.angle) > 0.5) carHull -= selectedVehicle === 'titanz' ? 1 : 12; 
+                    if(Math.abs(car.angle) > 0.5) carHull -= (selectedVehicle === 'titanz' || selectedVehicle === 'nexus') ? 0 : 12; 
                     car.angle = 0; car.rotSpeed = 0;
                 }
             }
 
             if(carHull <= 0) { carHull = 0; gameOver = true; clearInterval(timerInterval); if(!cheatActive) globalMoney += currentSessionMoney; }
-            
             document.getElementById('txtHull').innerText = Math.floor(carHull);
             document.getElementById('hullBar').style.width = carHull + "%";
 
-            if(Math.random() < 0.08 && debris.length < 35) debris.push({ x: tornado.x + (Math.random() * 300) - 150, y: groundY() - 20, size: 5+Math.random()*10, vx: 4+Math.random()*6, vy: -6-Math.random()*8 });
+            if(Math.random() < 0.08 && debris.length < 40 && !tornado.isSupercell) debris.push({ x: tornado.x + (Math.random() * 300) - 150, y: groundY() - 350, size: 5+Math.random()*10, vx: (Math.random() * 8) - 4, vy: 2 });
+            
             debris.forEach((d, idx) => {
-                d.vy += 0.24; d.x += d.vx; d.y += d.vy;
+                d.vy += 0.15; d.x += d.vx; d.y += d.vy;
                 if(d.x > car.x && d.x < car.x + car.width && d.y > car.y && d.y < car.y + car.height) {
-                    if((selectedVehicle === 'titan' || selectedVehicle === 'titanz') && car.isAnchored && spikeProgress >= 100) {
-                        currentSessionMoney += selectedVehicle === 'titanz' ? 60 : 25; document.getElementById('txtMoney').innerText = currentSessionMoney;
+                    if((selectedVehicle === 'titan' || selectedVehicle === 'titanz' || selectedVehicle === 'nexus') && car.isAnchored && spikeProgress >= 100) {
+                        currentSessionMoney += selectedVehicle === 'nexus' ? 250 : (selectedVehicle === 'titanz' ? 60 : 25); document.getElementById('txtMoney').innerText = currentSessionMoney;
                     } else { carHull -= (selectedVehicle === 'scout' || selectedVehicle === 'dow') ? 7 : 1.0; }
                     debris.splice(idx, 1);
                 }
-                if(d.y > canvas.height || d.x > canvas.width) debris.splice(idx, 1);
+                if(d.y > canvas.height + 200) debris.splice(idx, 1);
             });
 
             probes.forEach((p) => {
                 p.pulseAnim += 0.1;
                 let pDistToTornado = Math.abs(p.x - tornado.x);
-                if(pDistToTornado < tornado.widthBase * 1.8) { p.inTornado = true; currentSessionMoney += 12; document.getElementById('txtMoney').innerText = currentSessionMoney; } 
-                else { p.inTornado = false; }
+                if(pDistToTornado < tornado.widthBase * 1.8 && !tornado.isSupercell) { 
+                    p.inTornado = true; currentSessionMoney += selectedVehicle === 'nexus' ? 50 : 12; document.getElementById('txtMoney').innerText = currentSessionMoney; 
+                } else { p.inTornado = false; }
             });
 
             textAlerts.forEach((a, idx) => {
-                if (a.text.includes("🚨")) a.alpha -= 0.005;
-                else { a.y -= 0.8; a.alpha -= 0.015; }
+                a.alpha -= 0.015;
                 if(a.alpha <= 0) textAlerts.splice(idx, 1);
             });
 
-            if(particles.length < 550) particles.push({ heightY: Math.random() * canvas.height, angle: Math.random() * Math.PI * 2, rotSpeed: 0.03 + Math.random()*0.04, size: 4 + Math.random()*12 });
-            rainParticles.forEach(r => { r.y += r.s; r.x -= 15; if(r.y > canvas.height) { r.y = 0; r.x = Math.random()*canvas.width; } });
+            if(particles.length < 400) particles.push({ offsetGlobalX: (Math.random() - 0.5) * 2000, heightY: Math.random() * canvas.height, angle: Math.random() * Math.PI * 2, rotSpeed: 0.03 + Math.random()*0.04, size: 4 + Math.random()*12 });
+            rainParticles.forEach(r => { r.y += r.s; r.x -= 8; if(r.y > canvas.height) { r.y = 0; r.x = Math.random()*canvas.width; } });
+        }
+
+        function drawInfiniteScenery(ctx, camX) {
+            let startGridX = Math.floor(camX / 300) * 300 - 600;
+            let endGridX = startGridX + canvas.width + 1200;
+
+            for(let x = startGridX; x < endGridX; x += 300) {
+                let pseudoSeed1 = Math.abs(Math.sin(x * 0.0051)) * 100;
+                let pseudoSeed2 = Math.abs(Math.cos(x * 0.073)) * 100;
+                
+                if(pseudoSeed1 > 35) {
+                    let houseW = 50 + (pseudoSeed2 % 20);
+                    let houseH = 30 + (pseudoSeed1 % 15);
+                    let houseX = x + (pseudoSeed2 * 2.5) % 150;
+                    let isDestroyed = (tornado.opacity > 0 && !tornado.isSupercell && Math.abs(houseX - tornado.x) < tornado.widthBase / 1.1);
+                    
+                    if(!isDestroyed) {
+                        ctx.fillStyle = ['#475569', '#1e293b', '#7f1d1d', '#14532d'][Math.floor(pseudoSeed1) % 4];
+                        ctx.fillRect(houseX, groundY() - houseH, houseW, houseH);
+                        ctx.fillStyle = '#450a0a';
+                        ctx.beginPath();
+                        ctx.moveTo(houseX - 3, groundY() - houseH);
+                        ctx.lineTo(houseX + houseW / 2, groundY() - houseH - 12);
+                        ctx.lineTo(houseX + houseW + 3, groundY() - houseH);
+                        ctx.closePath();
+                        ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#292524'; ctx.fillRect(houseX, groundY() - 6, houseW, 6);
+                    }
+                }
+
+                if(pseudoSeed2 > 40) {
+                    let treeX = x + 150 + (pseudoSeed1 * 2) % 120;
+                    let treeH = 25 + (pseudoSeed2 % 25);
+                    let distToTornado = treeX - tornado.x;
+                    let isSnapped = (tornado.opacity > 0 && !tornado.isSupercell && Math.abs(distToTornado) < tornado.widthBase / 1.2);
+                    
+                    ctx.save();
+                    ctx.translate(treeX, groundY());
+                    if(!tornado.isSupercell && Math.abs(distToTornado) < tornado.pullRadius) {
+                        let force = (1 - (Math.abs(distToTornado) / tornado.pullRadius));
+                        ctx.rotate((distToTornado > 0 ? -1 : 1) * force * 0.8);
+                    }
+                    
+                    if(!isSnapped) {
+                        ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -treeH, 6, treeH);
+                        ctx.fillStyle = '#1e4620'; ctx.beginPath(); ctx.arc(0, -treeH, treeH * 0.4, 0, Math.PI * 2); ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -8, 6, 8);
+                    }
+                    ctx.restore();
+                }
+            }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             let sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            if (isNight) {
-                let nColor = Math.floor(8 + lightningAlpha * 40);
-                sky.addColorStop(0, `rgb(${nColor-4}, ${nColor-2}, ${nColor+5})`); sky.addColorStop(1, '#020205');
-            } else {
+            
+            if(!isFreeMode) {
                 sky.addColorStop(0, '#040507'); sky.addColorStop(0.6, '#0d1015'); sky.addColorStop(1, '#08090c');
+            } else {
+                let r1 = 20, g1 = 25, b1 = 35, r2 = 5, g2 = 6, b2 = 12;
+                if (lightningAlpha > 0) {
+                    let add = Math.floor(lightningAlpha * 50);
+                    r1 = Math.min(255, r1 + add); g1 = Math.min(255, g1 + add + 5); b1 = Math.min(255, b1 + add + 15);
+                }
+                sky.addColorStop(0, `rgb(${r1}, ${g1}, ${b1})`);
+                sky.addColorStop(1, `rgb(${r2}, ${g2}, ${b2})`);
             }
+            
             ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = isNight ? 'rgba(255, 255, 255, 0.08)' : 'rgba(130, 155, 185, 0.16)'; ctx.lineWidth = 1;
-            rainParticles.forEach(r => { ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - 15, r.y + r.s); ctx.stroke(); });
+            ctx.strokeStyle = 'rgba(130, 155, 185, 0.15)'; ctx.lineWidth = 1;
+            rainParticles.forEach(r => { ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - 10, r.y + r.s); ctx.stroke(); });
 
-            houses.forEach(h => {
-                let centerHouse = h.x + h.w / 2;
-                let baseline = h.depth === 'fundo' ? groundY() - 8 : groundY();
-                if (!h.isDestroyed) {
-                    ctx.fillStyle = h.color; ctx.fillRect(h.x, baseline - h.h, h.w, h.h); ctx.fillStyle = '#450a0a';
-                    ctx.beginPath(); ctx.moveTo(h.x - 3, baseline - h.h); ctx.lineTo(h.x + h.w / 2, baseline - h.h - 12); ctx.lineTo(h.x + h.w + 3, baseline - h.h); ctx.closePath(); ctx.fill();
-                } else { ctx.fillStyle = '#292524'; ctx.fillRect(h.x, baseline - 6, h.w, 6); }
-            });
+            ctx.save();
+            ctx.translate(-cameraX, 0);
 
-            trees.forEach(t => {
-                let baseline = t.depth === 'fundo' ? groundY() - 8 : groundY(); ctx.save(); ctx.translate(t.x, baseline); ctx.rotate(t.sway);
-                if(!t.isSnapped) {
-                    ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -t.h, 6, t.h); ctx.fillStyle = t.depth === 'fundo' ? '#14321a' : '#1e4620';
-                    ctx.beginPath(); ctx.arc(0, -t.h, t.h * 0.4, 0, Math.PI * 2); ctx.fill();
-                } else { ctx.fillStyle = '#5c4033'; ctx.fillRect(-3, -8, 6, 8); }
-                ctx.restore();
-            });
+            drawInfiniteScenery(ctx, cameraX);
 
             probes.forEach(p => {
                 ctx.strokeStyle = p.inTornado ? 'rgba(234, 88, 12, 0.5)' : 'rgba(100, 116, 139, 0.4)'; ctx.lineWidth = 2;
@@ -576,138 +809,155 @@
                 particles.forEach(p => {
                     p.angle += p.rotSpeed;
                     let heightFactor = (groundY() - p.heightY) / groundY(); if (heightFactor < 0) heightFactor = 0;
-                    let currentRadius = tornado.widthBase + (tornado.widthTop - tornado.widthBase) * heightFactor;
+                    
+                    let currentRadius;
+                    if(tornado.isSupercell) {
+                        currentRadius = tornado.widthBase * 2.5 + (tornado.widthTop * 1.5 - tornado.widthBase) * heightFactor;
+                        if(p.heightY > groundY() - 140) return; 
+                    } else {
+                        currentRadius = tornado.widthBase + (tornado.widthTop - tornado.widthBase) * heightFactor;
+                    }
+                    
                     let posX = tornado.x + Math.sin(p.angle) * currentRadius;
-                    let baseVisibility = isNight ? (0.05 + lightningAlpha * 0.4) : (0.22 + (heightFactor * 0.28));
-                    ctx.fillStyle = `rgba(32, 35, 41, ${baseVisibility * tornado.opacity})`;
+                    let baseVisibility = 0.22 + (heightFactor * 0.28);
+
+                    ctx.fillStyle = tornado.isSupercell ? `rgba(55, 62, 75, ${baseVisibility * 0.55 * tornado.opacity})` : `rgba(32, 35, 41, ${baseVisibility * tornado.opacity})`;
                     ctx.beginPath(); ctx.arc(posX, p.heightY, p.size * (1.2 + heightFactor * 5.0), 0, Math.PI*2); ctx.fill();
                 });
             }
-
-            ctx.fillStyle = '#050608'; ctx.fillRect(0, groundY(), canvas.width, 100);
-            ctx.fillStyle = '#141822'; ctx.fillRect(0, groundY(), canvas.width, 10);
-            for(let i=0; i<canvas.width; i+=90) { ctx.fillStyle = 'rgba(212, 175, 55, 0.25)'; ctx.fillRect(i, groundY() + 45, 40, 4); }
-
-            if (!inGame) return;
 
             ctx.fillStyle = '#292524'; debris.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI*2); ctx.fill(); });
 
             if(showWindWarning && Math.floor(Date.now() / 250) % 2 === 0) {
                 ctx.fillStyle = '#ef4444'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
-                ctx.fillText('⚠️ ALERTA: DEPLOY REQUERIDO ⚠️', car.x + car.width/2, car.y - 18);
+                ctx.fillText('⚠️ ALERTA: LIMITE ESTRUTURAL EXCEDIDO ⚠️', car.x + car.width/2, car.y - 18);
             }
-
-            textAlerts.forEach(a => {
-                ctx.fillStyle = `rgba(239, 68, 68, ${a.alpha})`;
-                ctx.font = a.text.includes("🚨") ? 'bold 18px sans-serif' : 'bold 11px sans-serif';
-                ctx.textAlign = 'center'; ctx.fillText(a.text, a.x, a.y);
-            });
 
             ctx.save();
+            ctx.globalAlpha = 1 - (insideTornadoFactor * 0.65);
             ctx.translate(car.x + car.width / 2, car.y + car.height / 2); ctx.rotate(car.angle); ctx.translate(-(car.width / 2), -(car.height / 2));
 
-            // SISTEMA DE ESPETOS HIDRÁULICOS
             if (spikeProgress > 0) {
-                let ext = (spikeProgress / 100);
-                ctx.fillStyle = '#475569'; 
-                if(selectedVehicle === 'dom') ctx.fillStyle = '#a1a1aa'; 
-                ctx.fillRect(12, car.height - 2, 5, ext * 12); 
-                ctx.fillRect(car.width - 17, car.height - 2, 5, ext * 12);
+                let ext = (spikeProgress / 100); ctx.fillStyle = selectedVehicle === 'nexus' ? '#22d3ee' : '#94a3b8'; 
+                if(selectedVehicle === 'nexus') { for(let s=0; s<7; s++) { ctx.fillRect(10 + (s * 17), car.height - 2, 4, ext * 18); } } 
+                else { ctx.fillRect(14, car.height - 2, 6, ext * 15); ctx.fillRect(car.width - 20, car.height - 2, 6, ext * 15); }
             }
 
-            // CARROS ORIGINAIS
             if(selectedVehicle === 'tiv') {
-                ctx.fillStyle = '#475569'; 
-                ctx.beginPath(); 
-                ctx.moveTo(0, car.height); 
-                ctx.lineTo(28, 4); 
-                ctx.lineTo(car.width - 12, 4); 
-                ctx.lineTo(car.width, car.height); 
-                ctx.closePath(); 
-                ctx.fill();
-                ctx.fillStyle = '#0f172a';
-                ctx.fillRect(35, 8, 18, 8);
-                ctx.fillRect(58, 8, 14, 8);
+                ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.moveTo(0, car.height); ctx.lineTo(24, 4); ctx.lineTo(car.width - 15, 4); ctx.lineTo(car.width, car.height); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#0f172a'; ctx.fillRect(35, 7, 18, 7); ctx.fillRect(58, 7, 16, 7);
+                ctx.fillStyle = '#475569'; ctx.fillRect(12, 18, car.width - 24, 2);
             } 
             else if(selectedVehicle === 'dom') {
-                ctx.fillStyle = '#1c1d22'; 
-                ctx.beginPath(); 
-                ctx.moveTo(0, car.height); 
-                ctx.quadraticCurveTo(32, -1 - (suspensionDrop * 0.5), car.width - 10, 8); 
-                ctx.lineTo(car.width, car.height); 
-                ctx.closePath(); 
-                ctx.fill();
-                ctx.fillStyle = '#334155';
-                ctx.fillRect(40, 6 - (suspensionDrop * 0.2), 22, 5);
+                ctx.fillStyle = '#15181e'; ctx.beginPath(); ctx.moveTo(0, car.height); ctx.quadraticCurveTo(30, -3 - (suspensionDrop * 0.4), car.width - 8, 6); ctx.lineTo(car.width, car.height); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(48, 12 - (suspensionDrop * 0.1), 10, 0, Math.PI, true); ctx.fill();
             } 
             else if(selectedVehicle === 'dow') {
-                ctx.fillStyle = '#cbd5e1'; 
-                ctx.fillRect(0, 10, car.width - 30, car.height - 10); 
-                ctx.fillStyle = '#94a3b8'; 
-                ctx.fillRect(car.width - 30, 6, 30, car.height - 6); 
-                
-                ctx.save(); 
-                ctx.translate(car.width / 3, 10 - radarHeight); 
-                ctx.fillStyle = '#475569'; 
-                ctx.fillRect(-2, 0, 4, radarHeight + 4); 
-                ctx.fillStyle = '#94a3b8'; 
-                ctx.beginPath(); 
-                ctx.arc(0, 0, 13, Math.PI, 0); 
-                ctx.fill(); 
-                ctx.restore();
+                ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, 10, car.width - 25, car.height - 10); ctx.fillStyle = '#cbd5e1'; ctx.fillRect(car.width - 25, 6, 25, car.height - 6); 
+                ctx.fillStyle = '#1e293b'; ctx.fillRect(car.width - 20, 9, 12, 7);
+                ctx.save(); ctx.translate(car.width / 2.5, 10 - radarHeight); ctx.fillStyle = '#475569'; ctx.fillRect(-3, 0, 6, radarHeight + 4); 
+                ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.arc(0, 0, 14, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#334155'; ctx.fillRect(-8, -2, 16, 2); ctx.restore();
             } 
             else if(selectedVehicle === 'titan' || selectedVehicle === 'titanz') {
-                ctx.fillStyle = selectedVehicle === 'titanz' ? '#24122c' : '#2d3748'; 
-                ctx.fillRect(0, 4, car.width, car.height - 4);
-                ctx.fillStyle = selectedVehicle === 'titanz' ? '#f472b6' : '#38bdf8';
-                ctx.fillRect(10, car.height - 10, car.width - 20, 2);
-                
+                ctx.fillStyle = selectedVehicle === 'titanz' ? '#1e0b24' : '#1e293b'; ctx.fillRect(0, 4, car.width, car.height - 4);
+                ctx.fillStyle = selectedVehicle === 'titanz' ? '#581c87' : '#475569'; ctx.fillRect(0, 4, car.width, 4);
+                ctx.fillStyle = selectedVehicle === 'titanz' ? '#f472b6' : '#38bdf8'; ctx.fillRect(12, car.height - 9, car.width - 24, 2.5);
+                ctx.fillStyle = '#020617'; ctx.fillRect(20, 10, 15, 6); ctx.fillRect(45, 10, 15, 6);
                 if(selectedVehicle === 'titanz') {
-                    ctx.save();
-                    ctx.translate(car.width - 35, 4 - radarHeight);
-                    ctx.fillStyle = '#581c87'; ctx.fillRect(-2, 0, 4, radarHeight);
-                    ctx.fillStyle = '#d946ef'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill();
-                    ctx.restore();
+                    ctx.save(); ctx.translate(car.width - 32, 4 - radarHeight); ctx.fillStyle = '#a21caf'; ctx.fillRect(-2, 0, 4, radarHeight);
+                    ctx.fillStyle = '#f472b6'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI*2); ctx.fill(); ctx.restore();
                 }
             } 
+            else if(selectedVehicle === 'nexus') {
+                ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.moveTo(0, car.height); ctx.lineTo(40, 2); ctx.lineTo(car.width - 20, 2); ctx.lineTo(car.width, car.height); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(10, car.height - 6); ctx.lineTo(car.width - 15, car.height - 6); ctx.stroke();
+                ctx.fillStyle = 'rgba(34, 211, 238, 0.6)'; ctx.beginPath(); ctx.moveTo(45, 6); ctx.lineTo(75, 6); ctx.lineTo(90, car.height - 10); ctx.lineTo(35, car.height - 10); ctx.closePath(); ctx.fill();
+            }
             else {
-                ctx.fillStyle = '#991b1b'; 
-                ctx.fillRect(0, 6, car.width - 28, car.height - 6); 
-                ctx.fillRect(car.width - 28, 12, 28, car.height - 12); 
-                ctx.fillStyle = '#1e293b'; 
-                ctx.fillRect(car.width - 24, 8, 14, 5); 
-                ctx.fillRect(15, 8, 18, 4); 
+                ctx.fillStyle = '#b91c1c'; ctx.fillRect(0, 6, car.width - 26, car.height - 6); ctx.fillStyle = '#7f1d1d'; ctx.fillRect(car.width - 26, 11, 26, car.height - 11); 
+                ctx.fillStyle = '#0f172a'; ctx.fillRect(20, 8, 16, 5); ctx.fillRect(42, 8, 12, 5); ctx.fillRect(car.width - 22, 13, 10, 4);
             }
 
             let rDrop = (selectedVehicle === 'dom' ? suspensionDrop : 0);
-            ctx.fillStyle = '#151b26'; 
-            if(selectedVehicle === 'titan' || selectedVehicle === 'titanz') {
+            ctx.fillStyle = '#0f172a'; ctx.strokeStyle = '#475569'; ctx.lineWidth = 1.5;
+            if(selectedVehicle === 'nexus') {
+                ctx.strokeStyle = '#22d3ee'; for(let r=0; r<8; r++) {
+                    let wheelX = 12 + (r * 14.5); ctx.beginPath(); ctx.arc(wheelX, car.height, 7, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(wheelX, car.height, 2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#0f172a';
+                }
+            } else if(selectedVehicle === 'titan' || selectedVehicle === 'titanz') {
                 [18, car.width / 2, car.width - 22].forEach(wheelX => {
-                    ctx.beginPath(); ctx.arc(wheelX, car.height, 8, 0, Math.PI*2); ctx.fill(); 
+                    ctx.beginPath(); ctx.arc(wheelX, car.height, 9, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.arc(wheelX, car.height, 3, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#0f172a';
                 });
             } else {
                 [18, car.width - 22].forEach(wheelX => {
-                    ctx.beginPath(); ctx.arc(wheelX, car.height - rDrop, 8, 0, Math.PI*2); ctx.fill(); 
+                    ctx.beginPath(); ctx.arc(wheelX, car.height - rDrop, 9, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.arc(wheelX, car.height - rDrop, 3, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#0f172a';
                 });
             }
-
             ctx.restore();
 
-            if(gameWon || gameOver) {
+            ctx.save();
+            ctx.translate(car.x + car.width / 2, car.y + car.height / 2); ctx.rotate(car.angle); ctx.translate(-(car.width / 2), -(car.height / 2));
+            
+            let lightGlowAlpha = 0.5 + (insideTornadoFactor * 0.5); 
+            let glowSize = insideTornadoFactor * 35;
+            
+            ctx.shadowColor = '#ef4444'; ctx.shadowBlur = glowSize; ctx.fillStyle = `rgba(239, 68, 68, ${lightGlowAlpha})`; ctx.fillRect(0, 12, 4, 6);
+            if(selectedVehicle === 'nexus') {
+                ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 15 + glowSize; ctx.fillStyle = `rgba(34, 211, 238, ${lightGlowAlpha + 0.2})`; ctx.fillRect(car.width - 5, 8, 5, 6);
+                ctx.fillStyle = `rgba(34, 211, 238, ${insideTornadoFactor * 0.35 + 0.2})`; ctx.beginPath(); ctx.moveTo(car.width, 11); ctx.lineTo(car.width + 240, -40); ctx.lineTo(car.width + 240, car.height + 60); ctx.closePath(); ctx.fill();
+            } else {
+                ctx.shadowColor = '#fef08a'; ctx.shadowBlur = 10 + glowSize; ctx.fillStyle = `rgba(254, 240, 138, ${lightGlowAlpha + 0.2})`; ctx.fillRect(car.width - 5, 12, 5, 5);
+                ctx.fillStyle = `rgba(254, 240, 138, ${insideTornadoFactor * 0.25 + 0.25})`; ctx.beginPath(); ctx.moveTo(car.width, 14); ctx.lineTo(car.width + 180, -25); ctx.lineTo(car.width + 180, car.height + 50); ctx.closePath(); ctx.fill();
+            }
+            ctx.restore();
+
+            textAlerts.forEach(a => {
+                ctx.fillStyle = `rgba(245, 158, 11, ${a.alpha})`; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(a.text, a.x, a.y);
+            });
+
+            ctx.restore(); 
+
+            ctx.fillStyle = '#050608'; ctx.fillRect(0, groundY(), canvas.width, 100);
+            ctx.fillStyle = '#141822'; ctx.fillRect(0, groundY(), canvas.width, 10);
+            let offsetRoad = Math.floor(cameraX % 90);
+            for(let i = -90; i < canvas.width + 90; i += 90) { ctx.fillStyle = 'rgba(212, 175, 55, 0.25)'; ctx.fillRect(i - offsetRoad, groundY() + 45, 40, 4); }
+
+            if(insideTornadoFactor > 0) {
+                ctx.fillStyle = `rgba(8, 9, 12, ${insideTornadoFactor * 0.85})`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                let shake = insideTornadoFactor * (tornado.maxWindForce / 65);
+                ctx.canvas.style.transform = `translate(${(Math.random()-0.5)*shake}px, ${(Math.random()-0.5)*shake}px)`;
+            } else { ctx.canvas.style.transform = "none"; }
+
+            if((gameWon || gameOver) && !isFreeMode) {
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = gameWon ? '#10b981' : '#ef4444'; ctx.font = 'bold 26px Segoe UI'; ctx.textAlign = 'center';
                 ctx.fillText(gameWon ? 'PARABÉNS! MISSÃO CUMPRIDA!' : 'VEÍCULO DESTRUÍDO!', canvas.width/2, canvas.height/2 - 30);
+            } else if (gameOver && isFreeMode) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ef4444'; ctx.font = 'bold 26px Segoe UI'; ctx.textAlign = 'center';
+                ctx.fillText('VEÍCULO DESTRUÍDO NO MOTO LIVRE!', canvas.width/2, canvas.height/2 - 30);
+                ctx.fillStyle = '#fff'; ctx.font = '16px Segoe UI'; ctx.fillText('O DINHEIRO COLETADO FOI SALVO COM SUCESSO.', canvas.width/2, canvas.height/2 + 10);
             }
         }
 
         function returnToMenu(e) {
-            if (e && e.target && (e.target.classList.contains('btn') || e.target.closest('#hud'))) return;
-            if(gameOver || gameWon) {
+            if (e && e.target && (e.target.classList.contains('btn-game') || e.target.id === 'btnExitFree' || e.target.id === 'btnManualDeploy' || e.target.closest('#hud'))) return;
+            if((gameOver || gameWon) && !isFreeMode) {
                 inGame = false; gameOver = false; gameWon = false;
-                document.getElementById('hud').style.display = 'none'; 
-                document.getElementById('controls').style.display = 'none';
-                document.getElementById('startScreen').style.display = 'flex'; 
-                updateMoneyUI();
+                document.getElementById('hud').style.display = 'none';
+                document.getElementById('btnManualDeploy').style.display = 'none';
+                document.getElementById('uiControls').style.display = 'none'; document.getElementById('uiActions').style.display = 'none';
+                document.getElementById('startScreen').style.display = 'flex'; updateMoneyUI();
+            } else if (gameOver && isFreeMode) {
+                inGame = false; gameOver = false;
+                document.getElementById('hud').style.display = 'none';
+                document.getElementById('btnManualDeploy').style.display = 'none';
+                document.getElementById('uiControls').style.display = 'none'; document.getElementById('uiActions').style.display = 'none';
+                document.getElementById('btnExitFree').style.display = 'none'; document.getElementById('startScreen').style.display = 'flex'; updateMoneyUI();
             }
         }
         
